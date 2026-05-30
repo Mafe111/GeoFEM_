@@ -1301,6 +1301,54 @@
         }
 
     </script>
+<!-- Script obligatorio del framework para habilitar las compuertas del puente -->
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+
+<script>
+    let servletPython = null;
+
+    // Inicializar el canal de comunicacion cuando el cascaron de escritorio levante
+    new QWebChannel(qt.webChannelTransport, function (channel) {
+        servletPython = channel.objects.pyBridge;
+        console.log("[Front-end Web] Canal con el Servlet de Python activo.");
+    });
+
+// Funcion que empaqueta los datos del Login (Simulacion Metodo POST)
+function enviarFormularioLogin() {
+    // CAPTURA MEJORADA: Lee el primer y segundo input del formulario sin importar su tipo
+    let inputs = document.querySelectorAll('#login input');
+    
+    // Si no encuentra inputs dentro de #login, busca de forma global en la pantalla
+    if (inputs.length === 0) {
+        inputs = document.querySelectorAll('input');
+    }
+
+    let txtUsuario = inputs[0] ? inputs[0].value.trim() : "";
+    let txtPassword = inputs[1] ? inputs[1].value.trim() : "";
+
+    console.log("[Front-end JS] Intentando enviar datos capturados:", txtUsuario);
+
+    if (servletPython) {
+        // Despachamos los datos de forma asincrona hacia el Servlet en Python
+        servletPython.procesar_formulario_login(txtUsuario, txtPassword, function (autorizado) {
+            if (autorizado) {
+                // Si el Servlet autoriza, usamos tus estilos CSS para ocultar el Login y mostrar el Dashboard
+                document.getElementById('login').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                console.log("[Front-end JS] Redireccion al Dashboard ejecutada.");
+            } else {
+                alert("Acceso denegado. Intenta con usuario: admin y clave: 1234");
+            }
+        });
+    } else {
+        console.error("El controlador Backend no esta disponible.");
+    }
+}
+
+
+    // Vinculamos tu boton verde menta (.btn-main) con la ejecucion del formulario
+    document.querySelector('.btn-main').setAttribute('onclick', 'enviarFormularioLogin()');
+</script>
 
 </body>
 
