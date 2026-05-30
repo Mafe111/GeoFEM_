@@ -8,9 +8,9 @@ def obtener_conexion():
     try:
         conexion = mysql.connector.connect(
             host="localhost",
-            user="root",          # Tu usuario de MySQL
-            password="tu_password",  # PON AQUÍ TU CONTRASEÑA DE MYSQL WORKBENCH
-            database="geotecnia_fem"
+            user="root",        
+            password="1234", 
+            database="taludes_fem"
         )
         if conexion.is_connected():
             return conexion
