@@ -62,7 +62,7 @@
         ====================================================== */
 
         #login{
-            display:flex;
+            display:none;
         }
 
         #login.active{
@@ -303,6 +303,107 @@
             font-weight:700;
 
             color:#64748b;
+        }
+
+        .project-card{
+            min-height:220px;
+            background:white;
+            border:1px solid #e2e8f0;
+            border-radius:22px;
+            padding:22px;
+            cursor:pointer;
+            transition:0.22s;
+            display:flex;
+            flex-direction:column;
+            justify-content:space-between;
+            box-shadow:0 8px 24px rgba(15,23,42,0.04);
+        }
+
+        .project-card:hover{
+            transform:translateY(-4px);
+            border-color:#8bd5c3;
+            box-shadow:0 14px 30px rgba(15,23,42,0.08);
+        }
+
+        .project-card-header{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:14px;
+        }
+
+        .project-card-title{
+            color:#0f172a;
+            font-size:18px;
+            font-weight:800;
+            line-height:1.25;
+        }
+
+        .project-card-id{
+            flex:0 0 auto;
+            background:#e8f7f3;
+            color:#287d6a;
+            border-radius:999px;
+            padding:5px 9px;
+            font-size:11px;
+            font-weight:800;
+        }
+
+        .project-card-code{
+            margin-top:10px;
+            color:#475569;
+            font-size:13px;
+            font-weight:700;
+        }
+
+        .project-card-location{
+            margin-top:8px;
+            color:#64748b;
+            font-size:13px;
+        }
+
+        .project-card-footer{
+            margin-top:20px;
+            padding-top:14px;
+            border-top:1px solid #edf2f7;
+            display:flex;
+            justify-content:space-between;
+            gap:12px;
+            color:#94a3b8;
+            font-size:11px;
+        }
+
+        .dashboard-status{
+            margin-top:18px;
+            min-height:22px;
+            color:#64748b;
+            font-size:13px;
+        }
+
+        .dashboard-status.error{
+            color:#b42318;
+        }
+
+        .workspace-actions{
+            display:flex;
+            align-items:center;
+            gap:14px;
+        }
+
+        .workspace-back{
+            border:1px solid #dbe4ee;
+            background:white;
+            color:#475569;
+            border-radius:10px;
+            padding:8px 12px;
+            font-size:12px;
+            font-weight:700;
+            cursor:pointer;
+        }
+
+        .workspace-back:hover{
+            border-color:#56bca2;
+            color:#287d6a;
         }
 
         /* =====================================================
@@ -683,7 +784,74 @@
             height:100%;
             object-fit:cover;
         }
+.properties-panel{
 
+    width:300px;
+
+    background:white;
+
+    border-left:1px solid #dbe4ee;
+
+    padding:18px;
+
+}
+
+.property-card{
+
+    background:#f8fafc;
+
+    border-radius:14px;
+
+    padding:16px;
+
+    margin-bottom:18px;
+
+}
+
+.property-card h4{
+
+    margin-bottom:10px;
+
+    color:#0d4557;
+
+}
+
+.property-card p{
+
+    margin-bottom:8px;
+
+    color:#475569;
+
+}
+
+#cadSvg{
+
+    width:100%;
+    height:100%;
+
+}
+
+.status-bar{
+
+    height:42px;
+
+    background:white;
+
+    border-top:1px solid #dbe4ee;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-around;
+
+    font-size:13px;
+
+    font-weight:600;
+
+    color:#475569;
+
+}
     </style>
 
 </head>
@@ -768,7 +936,7 @@
 
                 <button
                     class="btn-main"
-                    onclick="mostrarPantalla('dashboard')"
+                    onclick="enviarFormularioLogin()"
                 >
                     Ingresar →
                 </button>
@@ -810,10 +978,11 @@
                 Crea un nuevo modelo FEM geotécnico.
             </p>
 
-            <div class="cards">
+            <div class="cards" id="projectsGrid">
 
                 <div
                     class="card-new"
+                    id="newProjectCard"
                     onclick="abrirModal()"
                 >
 
@@ -828,6 +997,12 @@
                 </div>
 
             </div>
+
+            <div
+                id="projectsStatus"
+                class="dashboard-status"
+                aria-live="polite"
+            ></div>
 
         </div>
 
@@ -1053,37 +1228,58 @@
 
                 <div class="workspace-menu">
 
-                    <button class="menu-btn active">
-                        Archivo
-                    </button>
+    <button onclick="cambiarModulo('archivo',this)">
+        Archivo
+    </button>
 
-                    <button class="menu-btn">
-                        Proyecto
-                    </button>
+    <button onclick="cambiarModulo('proyecto',this)">
+        Proyecto
+    </button>
 
-                    <button class="menu-btn">
-                        Geometría
-                    </button>
+    <button
+        class="active"
+        onclick="cambiarModulo('geometria',this)"
+    >
+        Geometría
+    </button>
 
-                    <button class="menu-btn">
-                        Malla
-                    </button>
+    <button onclick="cambiarModulo('malla',this)">
+        Malla
+    </button>
 
-                    <button class="menu-btn">
-                        Materiales
-                    </button>
+    <button onclick="cambiarModulo('materiales',this)">
+        Materiales
+    </button>
 
-                    <button class="menu-btn">
-                        Resultados
-                    </button>
+    <button onclick="cambiarModulo('restricciones',this)">
+        Restricciones
+    </button>
 
-                </div>
+    <button onclick="cambiarModulo('analisis',this)">
+        Análisis
+    </button>
+
+    <button onclick="cambiarModulo('resultados',this)">
+        Resultados
+    </button>
+
+</div>
 
             </div>
 
-            <div class="workspace-user">
+            <div class="workspace-actions">
 
-                Ingeniero Civil ▼
+                <button
+                    class="workspace-back"
+                    onclick="volverAlDashboard()"
+                    title="Volver al listado de proyectos"
+                >
+                    ← Mis proyectos
+                </button>
+
+                <div class="workspace-user">
+                    Ingeniero Civil ▼
+                </div>
 
             </div>
 
@@ -1093,42 +1289,204 @@
 
         <div class="workspace-body">
 
-            <!-- SIDEBAR -->
+    <!-- PANEL IZQUIERDO -->
 
-            <div class="sidebar">
+    <div class="sidebar">
 
-                <div class="sidebar-title">
-                    Geometría
-                </div>
+        <div
+            class="sidebar-title"
+            id="toolTitle"
+        >
+            Geometría
+        </div>
 
-                <button class="tool-btn">
-                    Importar DXF
-                </button>
+        <div id="toolPanel">
 
-                <button class="tool-btn">
-                    Definir estratos
-                </button>
+            <button class="tool-btn">
+                📁 Importar DXF
+            </button>
 
-            </div>
+            <button class="tool-btn">
+                ✏ Dibujar Estrato
+            </button>
 
-            <!-- VISUAL -->
+            <button class="tool-btn">
+                ✏ Dibujar Línea
+            </button>
 
-            <div class="cad-area">
-
-                <div class="cad-container">
-
-                    <!-- CAMBIA workspace.png POR TU IMAGEN -->
-
-                    <img
-                        src="workspace.png"
-                        alt="workspace"
-                    >
-
-                </div>
-
-            </div>
+            <button class="tool-btn">
+                🧹 Limpiar
+            </button>
 
         </div>
+
+    </div>
+
+    <!-- ÁREA CAD -->
+
+    <div class="cad-area">
+
+        <div class="cad-container">
+
+            <svg
+                id="cadSvg"
+                viewBox="0 0 1200 800"
+                preserveAspectRatio="xMidYMid meet"
+            >
+
+                <defs>
+
+                    <pattern
+                        id="grid"
+                        width="25"
+                        height="25"
+                        patternUnits="userSpaceOnUse"
+                    >
+
+                        <path
+                            d="M 25 0 L 0 0 0 25"
+                            fill="none"
+                            stroke="#e2e8f0"
+                            stroke-width="1"
+                        />
+
+                    </pattern>
+
+                </defs>
+
+                <rect
+                    width="100%"
+                    height="100%"
+                    fill="url(#grid)"
+                />
+
+                <!-- TALUD DEMO -->
+
+                <polygon
+                    points="
+                    150,550
+                    500,300
+                    850,300
+                    850,650
+                    150,650
+                    "
+                    fill="#d4f4eb"
+                    stroke="#0d4557"
+                    stroke-width="3"
+                />
+
+                <!-- TEXTO -->
+
+                <text
+                    x="500"
+                    y="200"
+                    font-size="24"
+                    fill="#64748b"
+                >
+                    GeoFEM Workspace
+                </text>
+
+            </svg>
+
+        </div>
+
+    </div>
+
+    <!-- PANEL PROPIEDADES -->
+
+    <div class="properties-panel">
+
+        <div class="sidebar-title">
+            Propiedades
+        </div>
+
+        <div class="property-card">
+
+            <h4>
+                Proyecto
+            </h4>
+
+            <p>
+                Nombre:
+                <span id="propNombre">
+                    Talud Principal
+                </span>
+            </p>
+
+            <p>
+                Estado:
+                Activo
+            </p>
+
+        </div>
+
+        <div class="property-card">
+
+            <h4>
+                Geometría
+            </h4>
+
+            <p>
+                Estratos:
+                1
+            </p>
+
+            <p>
+                Polígonos:
+                1
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- BARRA ESTADO -->
+
+<div class="status-bar">
+
+    <div>
+
+        Factor de Seguridad:
+
+        <span id="txt-fos">
+            --
+        </span>
+
+    </div>
+
+    <div>
+
+        Nodos:
+
+        <span id="txt-nodos">
+            0
+        </span>
+
+    </div>
+
+    <div>
+
+        Elementos:
+
+        <span id="txt-elementos">
+            0
+        </span>
+
+    </div>
+
+    <div>
+
+        Estado:
+
+        <span id="txt-status">
+            Listo
+        </span>
+
+    </div>
+
+</div>
 
     </div>
 
@@ -1137,6 +1495,15 @@
     ====================================================== -->
 
     <script>
+
+        /* =====================================================
+           ESTADO BÁSICO DEL PROYECTO
+        ====================================================== */
+
+        // Sprint 0: por ahora guardamos únicamente los metadatos del proyecto
+        // abierto. En el Sprint CAD este objeto evolucionará al projectState.
+        let proyectoActivo = null;
+        let proyectosDashboard = [];
 
         /* =====================================================
            FECHA AUTOMÁTICA
@@ -1164,18 +1531,15 @@
         ).value = fecha;
 
         /* =====================================================
-           ID AUTOMÁTICO
+           ID DEL PROYECTO
         ====================================================== */
 
-        const idProyecto =
-            "GF-" +
-            Math.floor(
-                Math.random() * 99999
-            );
-
+        // El ID verdadero lo asigna MySQL cuando el proyecto se guarda.
+        // Evitamos inventar un ID en JavaScript porque eso rompería la
+        // trazabilidad entre la interfaz y la base de datos.
         document.getElementById(
             "idProyecto"
-        ).value = idProyecto;
+        ).value = "Se asignará al guardar";
 
         /* =====================================================
            CAMBIAR PANTALLAS
@@ -1219,6 +1583,225 @@
         });
 
         /* =====================================================
+           DASHBOARD DE PROYECTOS
+        ====================================================== */
+
+        function establecerEstadoDashboard(mensaje, esError = false){
+
+            const estado = document.getElementById("projectsStatus");
+            estado.textContent = mensaje || "";
+            estado.classList.toggle("error", esError);
+
+        }
+
+        function formatearFechaDashboard(fechaIso){
+
+            if(!fechaIso){
+                return "Sin fecha";
+            }
+
+            const fechaObjeto = new Date(fechaIso);
+
+            if(Number.isNaN(fechaObjeto.getTime())){
+                return fechaIso;
+            }
+
+            return new Intl.DateTimeFormat(
+                "es-CO",
+                {
+                    year:"numeric",
+                    month:"2-digit",
+                    day:"2-digit"
+                }
+            ).format(fechaObjeto);
+
+        }
+
+        function crearTarjetaProyecto(proyecto){
+
+            const tarjeta = document.createElement("article");
+            tarjeta.className = "project-card";
+            tarjeta.tabIndex = 0;
+            tarjeta.setAttribute(
+                "aria-label",
+                `Abrir proyecto ${proyecto.nombre}`
+            );
+
+            const encabezado = document.createElement("div");
+            encabezado.className = "project-card-header";
+
+            const titulo = document.createElement("div");
+            titulo.className = "project-card-title";
+            titulo.textContent = proyecto.nombre || "Proyecto sin nombre";
+
+            const id = document.createElement("div");
+            id.className = "project-card-id";
+            id.textContent = `#${proyecto.id}`;
+
+            encabezado.append(titulo, id);
+
+            const cuerpo = document.createElement("div");
+
+            const codigo = document.createElement("div");
+            codigo.className = "project-card-code";
+            codigo.textContent = proyecto.codigo || "Sin código";
+
+            const ubicacion = document.createElement("div");
+            ubicacion.className = "project-card-location";
+            ubicacion.textContent = proyecto.ubicacion || "Sin ubicación";
+
+            cuerpo.append(codigo, ubicacion);
+
+            const pie = document.createElement("div");
+            pie.className = "project-card-footer";
+
+            const creado = document.createElement("span");
+            creado.textContent =
+                `Creado: ${formatearFechaDashboard(proyecto.fecha_creacion)}`;
+
+            const modificado = document.createElement("span");
+            modificado.textContent =
+                `Mod.: ${formatearFechaDashboard(proyecto.fecha_ultima_mod)}`;
+
+            pie.append(creado, modificado);
+
+            const contenidoSuperior = document.createElement("div");
+            contenidoSuperior.append(encabezado, cuerpo);
+
+            tarjeta.append(contenidoSuperior, pie);
+
+            tarjeta.addEventListener("click", () => {
+                abrirProyectoExistente(proyecto.id);
+            });
+
+            tarjeta.addEventListener("keydown", (evento) => {
+                if(evento.key === "Enter" || evento.key === " "){
+                    evento.preventDefault();
+                    abrirProyectoExistente(proyecto.id);
+                }
+            });
+
+            return tarjeta;
+
+        }
+
+        function renderizarProyectosDashboard(proyectos){
+
+            const contenedor = document.getElementById("projectsGrid");
+            const tarjetaNuevo = document.getElementById("newProjectCard");
+
+            // Eliminamos únicamente las tarjetas provenientes de MySQL.
+            contenedor
+                .querySelectorAll(".project-card")
+                .forEach(tarjeta => tarjeta.remove());
+
+            proyectos.forEach(proyecto => {
+                contenedor.appendChild(crearTarjetaProyecto(proyecto));
+            });
+
+            if(proyectos.length === 0){
+                establecerEstadoDashboard(
+                    "Todavía no hay proyectos guardados. Crea el primero con la tarjeta +."
+                );
+            } else {
+                establecerEstadoDashboard(
+                    `${proyectos.length} proyecto(s) cargado(s) desde MySQL.`
+                );
+            }
+
+            // Conservamos la tarjeta "Nuevo" siempre como primer elemento.
+            if(contenedor.firstElementChild !== tarjetaNuevo){
+                contenedor.prepend(tarjetaNuevo);
+            }
+
+        }
+
+        function cargarProyectosDashboard(){
+
+            establecerEstadoDashboard("Cargando proyectos...");
+
+            if(!servletPython){
+                establecerEstadoDashboard(
+                    "Python todavía no está conectado. Ejecuta GeoFEM desde app.py.",
+                    true
+                );
+                return;
+            }
+
+            servletPython.obtener_proyectos_dashboard(function(respuestaJson){
+
+                let respuesta;
+
+                try{
+                    respuesta = JSON.parse(respuestaJson);
+                } catch(error){
+                    console.error("[GeoFEM] JSON inválido desde Python:", error);
+                    establecerEstadoDashboard(
+                        "La respuesta del backend no pudo interpretarse.",
+                        true
+                    );
+                    return;
+                }
+
+                if(!respuesta.ok){
+                    proyectosDashboard = [];
+                    renderizarProyectosDashboard([]);
+                    establecerEstadoDashboard(
+                        respuesta.mensaje || "No fue posible cargar los proyectos.",
+                        true
+                    );
+                    return;
+                }
+
+                proyectosDashboard = respuesta.proyectos || [];
+                renderizarProyectosDashboard(proyectosDashboard);
+
+                console.log(
+                    `[GeoFEM] Dashboard: ${proyectosDashboard.length} proyecto(s).`
+                );
+
+            });
+
+        }
+
+        function activarProyecto(proyecto){
+
+            proyectoActivo = {...proyecto};
+
+            document.getElementById("workspaceProjectName").textContent =
+                proyectoActivo.nombre;
+
+            document.getElementById("txt-status").textContent =
+                `Proyecto #${proyectoActivo.id} · ${proyectoActivo.codigo}`;
+
+            console.log("[GeoFEM] Proyecto activo:", proyectoActivo);
+
+        }
+
+        function abrirProyectoExistente(proyectoId){
+
+            const proyecto = proyectosDashboard.find(
+                item => Number(item.id) === Number(proyectoId)
+            );
+
+            if(!proyecto){
+                alert("No se encontró el proyecto seleccionado en el Dashboard.");
+                return;
+            }
+
+            activarProyecto(proyecto);
+            mostrarPantalla("workspace");
+
+        }
+
+        function volverAlDashboard(){
+
+            mostrarPantalla("dashboard");
+            cargarProyectosDashboard();
+
+        }
+
+        /* =====================================================
            ABRIR MODAL
         ====================================================== */
 
@@ -1248,58 +1831,229 @@
 
         function crearProyecto(){
 
-            const nombre =
-                document.getElementById(
-                    "nombreProyecto"
-                ).value;
+            const nombre = document.getElementById("nombreProyecto").value.trim();
+            const codigo = document.getElementById("codigoProyecto").value.trim();
+            const ubicacion = document.getElementById("ubicacionProyecto").value.trim();
 
-            const codigo =
-                document.getElementById(
-                    "codigoProyecto"
-                ).value;
-
-            const ubicacion =
-                document.getElementById(
-                    "ubicacionProyecto"
-                ).value;
-
-            if(nombre.trim() === ""){
-
-                alert(
-                    "Ingresa el nombre del proyecto"
-                );
-
+            if(nombre === ""){
+                alert("Ingresa el nombre del proyecto");
                 return;
             }
 
-            if(codigo.trim() === ""){
-
-                alert(
-                    "Ingresa el código del proyecto"
-                );
-
+            if(codigo === ""){
+                alert("Ingresa el código del proyecto");
                 return;
             }
 
-            if(ubicacion.trim() === ""){
-
-                alert(
-                    "Ingresa la ubicación"
-                );
-
+            if(ubicacion === ""){
+                alert("Ingresa la ubicación");
                 return;
             }
 
-            document.getElementById(
-                "workspaceProjectName"
-            ).innerText = nombre;
+            if(!servletPython){
+                alert(
+                    "GeoFEM no está conectado con Python. " +
+                    "Inicia la aplicación desde app.py y no abriendo el HTML directamente."
+                );
+                return;
+            }
 
-            cerrarModal();
+            // QWebChannel ejecuta Python de forma asíncrona.
+            // Python devuelve el ID creado por MySQL.
+            servletPython.procesar_formulario_proyecto(
+                nombre,
+                codigo,
+                ubicacion,
+                function(proyectoId){
 
-            mostrarPantalla("workspace");
+                    if(proyectoId > 0){
+                        document.getElementById("idProyecto").value = proyectoId;
 
+                        const nuevoProyecto = {
+                            id: Number(proyectoId),
+                            nombre: nombre,
+                            codigo: codigo,
+                            ubicacion: ubicacion,
+                            fecha_creacion: new Date().toISOString(),
+                            fecha_ultima_mod: new Date().toISOString()
+                        };
+
+                        activarProyecto(nuevoProyecto);
+
+                        cerrarModal();
+                        mostrarPantalla("workspace");
+
+                        console.log(
+                            `[GeoFEM] Proyecto ${proyectoId} guardado y abierto correctamente.`
+                        );
+                    } else {
+                        alert(
+                            "No fue posible guardar el proyecto en MySQL. " +
+                            "Revisa que MySQL esté iniciado, que exista la base taludes_fem " +
+                            "y que usuario/contraseña sean correctos."
+                        );
+                    }
+                }
+            );
         }
 
+function cambiarModulo(modulo, boton){
+
+    document
+    .querySelectorAll(
+        ".workspace-menu button"
+    )
+    .forEach(btn => {
+
+        btn.classList.remove(
+            "active"
+        );
+
+    });
+
+    boton.classList.add(
+        "active"
+    );
+
+    const panel =
+        document.getElementById(
+            "toolPanel"
+        );
+
+    const titulo =
+        document.getElementById(
+            "toolTitle"
+        );
+
+    if(modulo==="geometria"){
+
+        titulo.innerText =
+            "Geometría";
+
+        panel.innerHTML=`
+
+            <button class="tool-btn">
+                📁 Importar DXF
+            </button>
+
+            <button class="tool-btn">
+                ✏ Dibujar Estrato
+            </button>
+
+            <button class="tool-btn">
+                ✏ Dibujar Línea
+            </button>
+
+            <button class="tool-btn">
+                🧹 Limpiar
+            </button>
+
+        `;
+    }
+
+    if(modulo==="malla"){
+
+        titulo.innerText =
+            "Malla FEM";
+
+        panel.innerHTML=`
+
+            <button class="tool-btn">
+                ⚙ Generar Malla
+            </button>
+
+            <button class="tool-btn">
+                🔲 Mostrar Nodos
+            </button>
+
+            <button class="tool-btn">
+                🔺 Mostrar Elementos
+            </button>
+
+        `;
+    }
+
+    if(modulo==="materiales"){
+
+        titulo.innerText =
+            "Materiales";
+
+        panel.innerHTML=`
+
+            <button class="tool-btn">
+                ➕ Nuevo Material
+            </button>
+
+            <button class="tool-btn">
+                🎨 Asignar Material
+            </button>
+
+        `;
+    }
+
+    if(modulo==="restricciones"){
+
+        titulo.innerText =
+            "Restricciones";
+
+        panel.innerHTML=`
+
+            <button class="tool-btn">
+                ⚓ Base Fija
+            </button>
+
+            <button class="tool-btn">
+                ⬇ Carga Vertical
+            </button>
+
+            <button class="tool-btn">
+                ➡ Carga Horizontal
+            </button>
+
+        `;
+    }
+
+    if(modulo==="analisis"){
+
+        titulo.innerText =
+            "Análisis SSR";
+
+        panel.innerHTML=`
+
+            <button class="tool-btn">
+                🚀 Ejecutar SSR
+            </button>
+
+            <button class="tool-btn">
+                ⚙ Configuración
+            </button>
+
+        `;
+    }
+
+    if(modulo==="resultados"){
+
+        titulo.innerText =
+            "Resultados";
+
+        panel.innerHTML=`
+
+            <button class="tool-btn">
+                📊 Mapa de Calor
+            </button>
+
+            <button class="tool-btn">
+                📈 Factor Seguridad
+            </button>
+
+            <button class="tool-btn">
+                📄 Reporte PDF
+            </button>
+
+        `;
+    }
+
+}
     </script>
 <!-- Script obligatorio del framework para habilitar las compuertas del puente -->
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
@@ -1307,11 +2061,18 @@
 <script>
     let servletPython = null;
 
-    // Inicializar el canal de comunicacion cuando el cascaron de escritorio levante
-    new QWebChannel(qt.webChannelTransport, function (channel) {
-        servletPython = channel.objects.pyBridge;
-        console.log("[Front-end Web] Canal con el Servlet de Python activo.");
-    });
+    // Inicializar el canal únicamente dentro de la aplicación PyQt6.
+    // Si index.html se abre en Chrome/Edge, el objeto `qt` no existe.
+    if (typeof qt !== "undefined" && qt.webChannelTransport) {
+        new QWebChannel(qt.webChannelTransport, function (channel) {
+            servletPython = channel.objects.pyBridge;
+            console.log("[GeoFEM] QWebChannel conectado con Python.");
+        });
+    } else {
+        console.warn(
+            "[GeoFEM] QWebChannel no disponible. Ejecuta GeoFEM con: python app.py"
+        );
+    }
 
 // Funcion que empaqueta los datos del Login (Simulacion Metodo POST)
 function enviarFormularioLogin() {
@@ -1333,11 +2094,11 @@ function enviarFormularioLogin() {
         servletPython.procesar_formulario_login(txtUsuario, txtPassword, function (autorizado) {
             if (autorizado) {
                 // Si el Servlet autoriza, usamos tus estilos CSS para ocultar el Login y mostrar el Dashboard
-                document.getElementById('login').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                console.log("[Front-end JS] Redireccion al Dashboard ejecutada.");
+                mostrarPantalla("dashboard");
+                cargarProyectosDashboard();
+                console.log("[Front-end JS] Dashboard cargado desde MySQL.");
             } else {
-                alert("Acceso denegado. Intenta con usuario: admin y clave: 1234");
+                alert("Acceso denegado. Usa las credenciales de demostración mostradas en el formulario.");
             }
         });
     } else {
@@ -1345,9 +2106,6 @@ function enviarFormularioLogin() {
     }
 }
 
-
-    // Vinculamos tu boton verde menta (.btn-main) con la ejecucion del formulario
-    document.querySelector('.btn-main').setAttribute('onclick', 'enviarFormularioLogin()');
 </script>
 
 </body>

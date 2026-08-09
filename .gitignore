@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+
+# GeoFEM local/runtime files
+*.log
+
+# Future local configuration and generated outputs
+.env
+reports/*.pdf
+
+# Local historical drafts kept outside source control
+local_backups/

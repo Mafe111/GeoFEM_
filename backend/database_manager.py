@@ -1,98 +1,149 @@
-"""Modulo encargado de la persistencia de datos (CRUD) en MySQL para GeoFEM."""
+"""Persistencia MySQL de GeoFEM.
+
+Durante el Sprint 0 este módulo mantiene el CRUD de proyectos. Más adelante se
+convertirá en una capa Repository para desacoplar GeoFEM de una base de datos
+específica.
+"""
 
 import mysql.connector
 from mysql.connector import Error
 
+
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "1234",
+    "database": "taludes_fem",
+}
+
+
 def obtener_conexion():
-    """Establece la conexion con tu servidor local de MySQL."""
+    """Abre y devuelve una conexión MySQL, o ``None`` si falla."""
     try:
-        conexion = mysql.connector.connect(
-            host="localhost",
-            user="root",        
-            password="1234", 
-            database="taludes_fem"
-        )
+        conexion = mysql.connector.connect(**DB_CONFIG)
         if conexion.is_connected():
             return conexion
-    except Error as e:
-        print(f"Error de conexion: {e}")
-        return None
+    except Error as error:
+        print(f"[Database] Error de conexión: {error}")
 
-# =============================================================================
-# 1. INSERCIÓN (CREATE): Guarda un nuevo proyecto en la base de datos
-# =============================================================================
+    return None
+
+
 def insertar_proyecto(nombre: str, codigo: str, ubicacion: str) -> int:
-    """Inserta un nuevo proyecto y devuelve su ID generado."""
-    query = "INSERT INTO proyecto (nombre, codigo, ubicacion) VALUES (%s, %s, %s);"
+    """Inserta un proyecto y devuelve el ID autogenerado por MySQL."""
+    query = (
+        "INSERT INTO Proyecto (nombre, codigo, ubicacion) "
+        "VALUES (%s, %s, %s);"
+    )
     conexion = obtener_conexion()
-    if not conexion: return 0
+    cursor = None
+
+    if conexion is None:
+        return 0
+
     try:
         cursor = conexion.cursor()
         cursor.execute(query, (nombre, codigo, ubicacion))
-        conexion.commit() # Confirmar el guardado físico en el disco
-        return cursor.lastrowid # Nos devuelve el ID numérico que MySQL le asignó
-    except Error as e:
-        print(f"Error al insertar: {e}")
+        conexion.commit()
+        return int(cursor.lastrowid)
+    except Error as error:
+        conexion.rollback()
+        print(f"[Database] Error al insertar proyecto: {error}")
         return 0
     finally:
-        cursor.close()
-        conexion.close()
+        if cursor is not None:
+            cursor.close()
+        if conexion.is_connected():
+            conexion.close()
 
-# =============================================================================
-# 2. CONSULTA (READ): Trae la lista de todos los proyectos guardados
-# =============================================================================
-def consultar_proyectos() -> list:
-    """Extrae todos los proyectos de la base de datos para mostrarlos en el Dashboard."""
-    query = "SELECT id, nombre, codigo, ubicacion, fecha_creacion FROM proyecto ORDER BY id DESC;"
+
+def consultar_proyectos() -> list[dict] | None:
+    """Devuelve los proyectos o ``None`` si ocurre un error de base de datos.
+
+    La diferencia entre ``[]`` y ``None`` es intencional:
+
+    - ``[]`` significa que la consulta funcionó, pero todavía no hay proyectos.
+    - ``None`` significa que MySQL no pudo atender la consulta.
+
+    Esta distinción permite que el Dashboard muestre un estado vacío real sin
+    confundirlo con un fallo de conexión.
+    """
+    query = (
+        "SELECT id, nombre, codigo, ubicacion, fecha_creacion, fecha_ultima_mod "
+        "FROM Proyecto ORDER BY fecha_ultima_mod DESC, id DESC;"
+    )
     conexion = obtener_conexion()
-    if not conexion: return []
+    cursor = None
+
+    if conexion is None:
+        return None
+
     try:
-        cursor = conexion.cursor(dictionary=True) # Trae los datos ordenados con el nombre de su columna
+        cursor = conexion.cursor(dictionary=True)
         cursor.execute(query)
-        return cursor.fetchall() # Retorna la lista completa
-    except Error as e:
-        print(f"Error al consultar: {e}")
-        return []
+        return cursor.fetchall()
+    except Error as error:
+        print(f"[Database] Error al consultar proyectos: {error}")
+        return None
     finally:
-        cursor.close()
-        conexion.close()
+        if cursor is not None:
+            cursor.close()
+        if conexion.is_connected():
+            conexion.close()
 
-# =============================================================================
-# 3. ACTUALIZACIÓN (UPDATE): Modifica un proyecto que ya existe
-# =============================================================================
-def actualizar_proyecto(proyecto_id: int, nuevo_nombre: str, nueva_ubicacion: str) -> bool:
-    """Modifica el nombre o ubicacion de un proyecto usando su ID."""
-    query = "UPDATE proyecto SET nombre = %s, ubicacion = %s WHERE id = %s;"
+
+def actualizar_proyecto(
+    proyecto_id: int,
+    nuevo_nombre: str,
+    nueva_ubicacion: str,
+) -> bool:
+    """Actualiza el nombre y la ubicación de un proyecto existente."""
+    query = (
+        "UPDATE Proyecto SET nombre = %s, ubicacion = %s "
+        "WHERE id = %s;"
+    )
     conexion = obtener_conexion()
-    if not conexion: return False
+    cursor = None
+
+    if conexion is None:
+        return False
+
     try:
         cursor = conexion.cursor()
         cursor.execute(query, (nuevo_nombre, nueva_ubicacion, proyecto_id))
         conexion.commit()
-        return True
-    except Error as e:
-        print(f"Error al actualizar: {e}")
+        return cursor.rowcount > 0
+    except Error as error:
+        conexion.rollback()
+        print(f"[Database] Error al actualizar proyecto: {error}")
         return False
     finally:
-        cursor.close()
-        conexion.close()
+        if cursor is not None:
+            cursor.close()
+        if conexion.is_connected():
+            conexion.close()
 
-# =============================================================================
-# 4. ELIMINACIÓN (DELETE): Borra un proyecto del sistema
-# =============================================================================
+
 def eliminar_proyecto(proyecto_id: int) -> bool:
-    """Elimina de forma fisica un proyecto de la base de datos."""
-    query = "DELETE FROM proyecto WHERE id = %s;"
+    """Elimina un proyecto de la base de datos usando su ID."""
+    query = "DELETE FROM Proyecto WHERE id = %s;"
     conexion = obtener_conexion()
-    if not conexion: return False
+    cursor = None
+
+    if conexion is None:
+        return False
+
     try:
         cursor = conexion.cursor()
         cursor.execute(query, (proyecto_id,))
         conexion.commit()
-        return True
-    except Error as e:
-        print(f"Error al eliminar: {e}")
+        return cursor.rowcount > 0
+    except Error as error:
+        conexion.rollback()
+        print(f"[Database] Error al eliminar proyecto: {error}")
         return False
     finally:
-        cursor.close()
-        conexion.close()
+        if cursor is not None:
+            cursor.close()
+        if conexion.is_connected():
+            conexion.close()
