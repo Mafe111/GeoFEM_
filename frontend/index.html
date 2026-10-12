@@ -710,7 +710,14 @@
 
         .workspace-body{
             display:flex;
-            height:calc(100vh - 72px);
+
+            /*
+             * El viewport y los paneles deben compartir el alto visible con
+             * la barra de estado. Antes se restaban solo los 72 px del menú
+             * superior y la barra inferior (42 px) quedaba fuera de pantalla.
+             */
+            height:calc(100vh - 72px - 42px);
+            min-height:0;
         }
 
         .sidebar{
@@ -851,6 +858,15 @@
     color:#0f766e;
     font-size:11px;
     font-weight:700;
+}
+
+.coordinate-value{
+    font-family:Consolas, "Courier New", monospace;
+    font-variant-numeric:tabular-nums;
+}
+
+#coordinateReferenceLayer{
+    pointer-events:none;
 }
 
 .status-bar{
@@ -1403,6 +1419,9 @@
 
                 <!-- Elementos de interfaz que no forman parte del modelo FEM. -->
                 <g id="overlayLayer">
+                    <!-- Ejes X/Y de referencia. No pertenecen a la geometría. -->
+                    <g id="coordinateReferenceLayer"></g>
+
                     <text
                         id="cadEmptyState"
                         x="600"
@@ -1494,6 +1513,33 @@
 
         </div>
 
+        <div class="property-card">
+
+            <h4>Viewport CAD</h4>
+
+            <p>
+                Unidades:
+                <span id="propUnidadLongitud">m</span>
+            </p>
+
+            <p>
+                Escala:
+                <span id="propEscalaViewport" class="coordinate-value">20.00</span>
+                SVG/m
+            </p>
+
+            <p>
+                Origen SVG:
+                <span id="propOrigenViewport" class="coordinate-value">(100, 700)</span>
+            </p>
+
+            <p>
+                Convención Y:
+                <span>positiva hacia arriba</span>
+            </p>
+
+        </div>
+
     </div>
 
 </div>
@@ -1534,6 +1580,15 @@
 
     <div>
 
+        Cursor:
+        X <span id="txt-cursor-x" class="coordinate-value">--</span> m
+        ·
+        Y <span id="txt-cursor-y" class="coordinate-value">--</span> m
+
+    </div>
+
+    <div>
+
         Estado:
 
         <span id="txt-status">
@@ -1550,8 +1605,9 @@
          JAVASCRIPT
     ====================================================== -->
 
-    <!-- Modelo interno del proyecto. Debe cargarse antes de app.js inline. -->
+    <!-- Modelo interno y transformaciones CAD. Deben cargarse antes del JS inline. -->
     <script src="js/project-state.js"></script>
+    <script src="js/viewport.js"></script>
 
     <script>
 
@@ -1868,6 +1924,14 @@
             document.getElementById("txt-fos").textContent =
                 projectState.results.fos ?? "--";
 
+            const viewport = projectState.viewport;
+            document.getElementById("propUnidadLongitud").textContent =
+                projectState.units.longitud;
+            document.getElementById("propEscalaViewport").textContent =
+                GeoFEMViewport.escalaEfectiva(viewport).toFixed(2);
+            document.getElementById("propOrigenViewport").textContent =
+                `(${viewport.originSvg.x}, ${viewport.originSvg.y})`;
+
         }
 
         function actualizarEstadoVacioCad(){
@@ -1900,12 +1964,66 @@
             actualizarPanelDesdeProjectState();
             actualizarEstadoVacioCad();
 
+            GeoFEMViewport.renderReferenceAxes(
+                document.getElementById("coordinateReferenceLayer"),
+                projectState.viewport
+            );
+
             console.log(
                 "[GeoFEM] projectState renderizado:",
                 GeoFEMState.resumenProjectState(projectState)
             );
 
         }
+
+        function actualizarLecturaCursor(puntoModelo = null){
+
+            const x = document.getElementById("txt-cursor-x");
+            const y = document.getElementById("txt-cursor-y");
+
+            if(!puntoModelo){
+                x.textContent = "--";
+                y.textContent = "--";
+                return;
+            }
+
+            x.textContent = puntoModelo.x.toFixed(2);
+            y.textContent = puntoModelo.y.toFixed(2);
+
+        }
+
+        function configurarLecturaCoordenadasCad(){
+
+            const svg = document.getElementById("cadSvg");
+
+            svg.addEventListener("pointermove", (evento) => {
+
+                const conversion = GeoFEMViewport.eventToModel(
+                    svg,
+                    evento,
+                    projectState.viewport
+                );
+
+                actualizarLecturaCursor(conversion.model);
+
+            });
+
+            svg.addEventListener("pointerleave", () => {
+                actualizarLecturaCursor(null);
+            });
+
+            // Prueba numérica de ida y vuelta. Si las transformaciones son
+            // correctas, recuperar (10,5) debe producir prácticamente (10,5).
+            const prueba = GeoFEMViewport.roundTripError(
+                {x: 10, y: 5},
+                projectState.viewport
+            );
+
+            console.log("[GeoFEM] Prueba coordenadas modelo ↔ SVG:", prueba);
+
+        }
+
+        configurarLecturaCoordenadasCad();
 
         function activarProyecto(proyecto){
 

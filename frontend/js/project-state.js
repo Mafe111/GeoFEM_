@@ -81,12 +81,21 @@
             },
 
             viewport: {
+                // Sistema de coordenadas del CAD. Las coordenadas del modelo
+                // siempre se almacenan en unidades de ingeniería (m).
+                // `originSvg` y `baseScale` solo controlan cómo se observan
+                // dentro del SVG; nunca modifican la geometría real.
                 viewBox: {
                     x: 0,
                     y: 0,
                     width: 1200,
                     height: 800,
                 },
+                originSvg: {
+                    x: 100,
+                    y: 700,
+                },
+                baseScale: 20.0, // unidades SVG por metro a zoom = 1
                 zoom: 1.0,
                 pan: {
                     x: 0,
@@ -94,7 +103,8 @@
                 },
                 grid: {
                     enabled: true,
-                    spacing: 25,
+                    spacingModel: 1.0,
+                    majorEvery: 5,
                 },
                 snap: {
                     enabled: false,
