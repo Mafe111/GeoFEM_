@@ -1,0 +1,165 @@
+/*
+ * GeoFEM - Project State
+ * ----------------------
+ * Este archivo define la fuente de verdad del modelo abierto en el frontend.
+ * El SVG NO almacena el modelo: solo representa visualmente este estado.
+ *
+ * Se mantiene como JavaScript clásico (sin módulos ES) para que funcione de
+ * manera simple dentro de QWebEngine/QWebChannel durante el MVP.
+ */
+
+(function (global) {
+    "use strict";
+
+    const STATE_SCHEMA_VERSION = "1.0.0";
+
+    function normalizarProyecto(proyecto = {}) {
+        return {
+            id: proyecto.id !== undefined && proyecto.id !== null
+                ? Number(proyecto.id)
+                : null,
+            nombre: proyecto.nombre || "",
+            codigo: proyecto.codigo || "",
+            ubicacion: proyecto.ubicacion || "",
+            fechaCreacion: proyecto.fecha_creacion || proyecto.fechaCreacion || null,
+            fechaUltimaModificacion:
+                proyecto.fecha_ultima_mod ||
+                proyecto.fechaUltimaModificacion ||
+                null,
+        };
+    }
+
+    function crearProjectState(proyecto = {}) {
+        return {
+            schemaVersion: STATE_SCHEMA_VERSION,
+
+            project: normalizarProyecto(proyecto),
+
+            units: {
+                longitud: "m",
+                esfuerzo: "kPa",
+                pesoUnitario: "kN/m³",
+            },
+
+            geometry: {
+                points: [],
+                lines: [],
+                polylines: [],
+                regions: [],
+            },
+
+            materials: [],
+
+            mesh: {
+                elementType: "T3",
+                nodes: [],
+                elements: [],
+                visible: true,
+            },
+
+            boundaryConditions: [],
+            loads: [],
+
+            analysis: {
+                method: "SSR",
+                settings: {
+                    kh: 0.0,
+                    kv: 0.0,
+                    tolerance: 0.001,
+                    maxIterations: 500,
+                    initialSrf: 1.0,
+                    srfIncrement: 0.05,
+                },
+            },
+
+            results: {
+                fos: null,
+                displacements: [],
+                stresses: [],
+                failureBand: [],
+                converged: null,
+            },
+
+            viewport: {
+                viewBox: {
+                    x: 0,
+                    y: 0,
+                    width: 1200,
+                    height: 800,
+                },
+                zoom: 1.0,
+                pan: {
+                    x: 0,
+                    y: 0,
+                },
+                grid: {
+                    enabled: true,
+                    spacing: 25,
+                },
+                snap: {
+                    enabled: false,
+                    tolerancePx: 10,
+                },
+            },
+
+            ui: {
+                activeModule: "geometria",
+                activeTool: "select",
+                selection: [],
+            },
+
+            dirty: false,
+        };
+    }
+
+    function contarGeometria(state) {
+        const geometry = state && state.geometry ? state.geometry : {};
+
+        return {
+            points: Array.isArray(geometry.points) ? geometry.points.length : 0,
+            lines: Array.isArray(geometry.lines) ? geometry.lines.length : 0,
+            polylines: Array.isArray(geometry.polylines)
+                ? geometry.polylines.length
+                : 0,
+            regions: Array.isArray(geometry.regions) ? geometry.regions.length : 0,
+        };
+    }
+
+    function resumenProjectState(state) {
+        const geometry = contarGeometria(state);
+        const mesh = state && state.mesh ? state.mesh : {};
+
+        return {
+            projectId: state?.project?.id ?? null,
+            projectName: state?.project?.nombre ?? "",
+            geometry,
+            materials: Array.isArray(state?.materials) ? state.materials.length : 0,
+            nodes: Array.isArray(mesh.nodes) ? mesh.nodes.length : 0,
+            elements: Array.isArray(mesh.elements) ? mesh.elements.length : 0,
+            dirty: Boolean(state?.dirty),
+        };
+    }
+
+    function marcarModificado(state, valor = true) {
+        if (!state) {
+            return;
+        }
+
+        state.dirty = Boolean(valor);
+    }
+
+    const api = {
+        STATE_SCHEMA_VERSION,
+        crearProjectState,
+        contarGeometria,
+        resumenProjectState,
+        marcarModificado,
+    };
+
+    global.GeoFEMState = api;
+
+    // Permite probar este archivo con Node.js sin afectar QWebEngine.
+    if (typeof module !== "undefined" && module.exports) {
+        module.exports = api;
+    }
+})(typeof window !== "undefined" ? window : globalThis);

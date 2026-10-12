@@ -831,6 +831,28 @@
 
 }
 
+/* Capas del viewport CAD. En este Sprint son una estructura vacía
+   preparada para geometría, malla, restricciones y resultados. */
+#viewportContent > g{
+    vector-effect:non-scaling-stroke;
+}
+
+#cadEmptyState{
+    pointer-events:none;
+    user-select:none;
+}
+
+.state-version{
+    display:inline-block;
+    margin-top:8px;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#e6fffa;
+    color:#0f766e;
+    font-size:11px;
+    font-weight:700;
+}
+
 .status-bar{
 
     height:42px;
@@ -1332,6 +1354,7 @@
                 id="cadSvg"
                 viewBox="0 0 1200 800"
                 preserveAspectRatio="xMidYMid meet"
+                aria-label="Viewport CAD de GeoFEM"
             >
 
                 <defs>
@@ -1354,37 +1377,54 @@
 
                 </defs>
 
+                <!-- Fondo del viewport. En el Paso 3 el grid será dinámico. -->
                 <rect
-                    width="100%"
-                    height="100%"
+                    id="cadGridBackground"
+                    x="0"
+                    y="0"
+                    width="1200"
+                    height="800"
                     fill="url(#grid)"
                 />
 
-                <!-- TALUD DEMO -->
+                <!--
+                    CONTENIDO DEL MODELO
+                    --------------------
+                    Estas capas NO son la fuente de verdad. Se dibujan a partir
+                    de projectState. El orden también define qué queda encima.
+                -->
+                <g id="viewportContent">
+                    <g id="geometryLayer"></g>
+                    <g id="meshLayer"></g>
+                    <g id="boundaryLayer"></g>
+                    <g id="resultLayer"></g>
+                    <g id="selectionLayer"></g>
+                </g>
 
-                <polygon
-                    points="
-                    150,550
-                    500,300
-                    850,300
-                    850,650
-                    150,650
-                    "
-                    fill="#d4f4eb"
-                    stroke="#0d4557"
-                    stroke-width="3"
-                />
-
-                <!-- TEXTO -->
-
-                <text
-                    x="500"
-                    y="200"
-                    font-size="24"
-                    fill="#64748b"
-                >
-                    GeoFEM Workspace
-                </text>
+                <!-- Elementos de interfaz que no forman parte del modelo FEM. -->
+                <g id="overlayLayer">
+                    <text
+                        id="cadEmptyState"
+                        x="600"
+                        y="390"
+                        text-anchor="middle"
+                        font-size="24"
+                        font-weight="700"
+                        fill="#64748b"
+                    >
+                        Proyecto sin geometría
+                    </text>
+                    <text
+                        id="cadEmptyStateSubtitle"
+                        x="600"
+                        y="425"
+                        text-anchor="middle"
+                        font-size="14"
+                        fill="#94a3b8"
+                    >
+                        El modelo CAD se generará desde projectState
+                    </text>
+                </g>
 
             </svg>
 
@@ -1402,38 +1442,54 @@
 
         <div class="property-card">
 
-            <h4>
-                Proyecto
-            </h4>
+            <h4>Proyecto activo</h4>
+
+            <p>
+                ID:
+                <span id="propProyectoId">--</span>
+            </p>
 
             <p>
                 Nombre:
-                <span id="propNombre">
-                    Talud Principal
-                </span>
+                <span id="propNombre">Sin proyecto</span>
             </p>
 
             <p>
-                Estado:
-                Activo
+                Código:
+                <span id="propCodigo">--</span>
             </p>
+
+            <span
+                class="state-version"
+                id="propStateVersion"
+            >
+                State --
+            </span>
 
         </div>
 
         <div class="property-card">
 
-            <h4>
-                Geometría
-            </h4>
+            <h4>Modelo interno</h4>
 
             <p>
-                Estratos:
-                1
+                Puntos:
+                <span id="propPuntos">0</span>
             </p>
 
             <p>
-                Polígonos:
-                1
+                Líneas:
+                <span id="propLineas">0</span>
+            </p>
+
+            <p>
+                Regiones:
+                <span id="propRegiones">0</span>
+            </p>
+
+            <p>
+                Materiales:
+                <span id="propMateriales">0</span>
             </p>
 
         </div>
@@ -1494,16 +1550,24 @@
          JAVASCRIPT
     ====================================================== -->
 
+    <!-- Modelo interno del proyecto. Debe cargarse antes de app.js inline. -->
+    <script src="js/project-state.js"></script>
+
     <script>
 
         /* =====================================================
-           ESTADO BÁSICO DEL PROYECTO
+           ESTADO CENTRAL DE GEOFEM
         ====================================================== */
 
-        // Sprint 0: por ahora guardamos únicamente los metadatos del proyecto
-        // abierto. En el Sprint CAD este objeto evolucionará al projectState.
+        // `proyectoActivo` se conserva temporalmente por compatibilidad con
+        // el Dashboard del Sprint 0. La fuente de verdad del Workspace pasa a
+        // ser `projectState`.
         let proyectoActivo = null;
         let proyectosDashboard = [];
+
+        // Estado vacío inicial. Al abrir/crear un proyecto se reemplaza por un
+        // estado nuevo asociado al ID real de MySQL.
+        let projectState = GeoFEMState.crearProjectState();
 
         /* =====================================================
            FECHA AUTOMÁTICA
@@ -1764,17 +1828,104 @@
 
         }
 
+        function limpiarCapaSvg(idCapa){
+
+            const capa = document.getElementById(idCapa);
+
+            if(capa){
+                capa.replaceChildren();
+            }
+
+        }
+
+        function actualizarPanelDesdeProjectState(){
+
+            const resumen = GeoFEMState.resumenProjectState(projectState);
+            const proyecto = projectState.project;
+
+            document.getElementById("propProyectoId").textContent =
+                proyecto.id ?? "--";
+            document.getElementById("propNombre").textContent =
+                proyecto.nombre || "Sin proyecto";
+            document.getElementById("propCodigo").textContent =
+                proyecto.codigo || "--";
+            document.getElementById("propStateVersion").textContent =
+                `State ${projectState.schemaVersion}`;
+
+            document.getElementById("propPuntos").textContent =
+                resumen.geometry.points;
+            document.getElementById("propLineas").textContent =
+                resumen.geometry.lines;
+            document.getElementById("propRegiones").textContent =
+                resumen.geometry.regions;
+            document.getElementById("propMateriales").textContent =
+                resumen.materials;
+
+            document.getElementById("txt-nodos").textContent =
+                resumen.nodes;
+            document.getElementById("txt-elementos").textContent =
+                resumen.elements;
+            document.getElementById("txt-fos").textContent =
+                projectState.results.fos ?? "--";
+
+        }
+
+        function actualizarEstadoVacioCad(){
+
+            const resumen = GeoFEMState.resumenProjectState(projectState);
+            const sinGeometria =
+                resumen.geometry.points === 0 &&
+                resumen.geometry.lines === 0 &&
+                resumen.geometry.polylines === 0 &&
+                resumen.geometry.regions === 0;
+
+            document.getElementById("cadEmptyState").style.display =
+                sinGeometria ? "block" : "none";
+            document.getElementById("cadEmptyStateSubtitle").style.display =
+                sinGeometria ? "block" : "none";
+
+        }
+
+        function renderizarProjectState(){
+
+            // Sprint 1 / Paso 1:
+            // todavía no dibujamos entidades. Preparamos y limpiamos las capas
+            // para garantizar que el SVG sea una representación del estado.
+            limpiarCapaSvg("geometryLayer");
+            limpiarCapaSvg("meshLayer");
+            limpiarCapaSvg("boundaryLayer");
+            limpiarCapaSvg("resultLayer");
+            limpiarCapaSvg("selectionLayer");
+
+            actualizarPanelDesdeProjectState();
+            actualizarEstadoVacioCad();
+
+            console.log(
+                "[GeoFEM] projectState renderizado:",
+                GeoFEMState.resumenProjectState(projectState)
+            );
+
+        }
+
         function activarProyecto(proyecto){
 
             proyectoActivo = {...proyecto};
 
+            // Creamos un estado NUEVO para el proyecto seleccionado.
+            // Evitamos que geometría/materiales de un proyecto puedan mezclarse
+            // accidentalmente con otro.
+            projectState = GeoFEMState.crearProjectState(proyectoActivo);
+
             document.getElementById("workspaceProjectName").textContent =
-                proyectoActivo.nombre;
+                projectState.project.nombre;
 
             document.getElementById("txt-status").textContent =
-                `Proyecto #${proyectoActivo.id} · ${proyectoActivo.codigo}`;
+                `Proyecto #${projectState.project.id} · ${projectState.project.codigo}`;
+
+            renderizarProjectState();
 
             console.log("[GeoFEM] Proyecto activo:", proyectoActivo);
+            console.log("[GeoFEM] Estado central:", projectState);
 
         }
 
@@ -1898,6 +2049,10 @@
         }
 
 function cambiarModulo(modulo, boton){
+
+    if(projectState && projectState.ui){
+        projectState.ui.activeModule = modulo;
+    }
 
     document
     .querySelectorAll(
