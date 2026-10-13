@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.2.0";
+    const STATE_SCHEMA_VERSION = "1.3.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -132,6 +132,8 @@
                 activeTool: "select",
                 selection: [],
                 lineDraftStartPointId: null,
+                polylineDraftPointIds: [],
+                polylineDraftCursorModel: null,
             },
 
             dirty: false,
