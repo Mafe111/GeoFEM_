@@ -869,6 +869,10 @@
     cursor:crosshair;
 }
 
+#cadSvg.tool-line{
+    cursor:crosshair;
+}
+
 /* Capas del viewport CAD. En este Sprint son una estructura vacía
    preparada para geometría, malla, restricciones y resultados. */
 #viewportContent > g{
@@ -1505,16 +1509,21 @@
                 ✏ Dibujar Estrato · próximamente
             </button>
 
-            <button class="tool-btn" disabled title="Se construirá en el siguiente bloque CAD">
-                ✏ Dibujar Línea · próximamente
+            <button
+                class="tool-btn"
+                data-cad-tool="line"
+                onclick="activarHerramientaCad('line')"
+                title="Haz clic en un punto inicial y luego en un punto final"
+            >
+                ╱ Crear Línea
             </button>
 
             <button
-                id="btnEliminarPuntoSeleccionado"
+                id="btnEliminarSeleccionado"
                 class="tool-btn danger-tool"
-                onclick="eliminarPuntoSeleccionadoCad()"
+                onclick="eliminarEntidadSeleccionadaCad()"
                 disabled
-                title="Selecciona un punto para eliminarlo"
+                title="Selecciona un punto o línea para eliminarlo"
             >
                 🗑 Eliminar seleccionado
             </button>
@@ -1669,7 +1678,7 @@
             <div id="propSelectionEmpty">
                 <p>Sin selección.</p>
                 <p style="font-size:12px; color:#64748b;">
-                    Usa ↖ Seleccionar y haz clic sobre un punto.
+                    Usa ↖ Seleccionar y haz clic sobre un punto o una línea.
                 </p>
             </div>
 
@@ -1721,6 +1730,37 @@
 
                 <div class="selection-hint">
                     El ID del punto se conserva al editar. También puedes usar la tecla Supr para eliminar la selección.
+                </div>
+            </div>
+
+            <div id="propSelectionLine" style="display:none;">
+                <p>
+                    Tipo: <strong>Línea</strong>
+                </p>
+                <p>
+                    ID: <span id="propSelectedLineId" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Punto inicial: <span id="propSelectedLineStart" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Punto final: <span id="propSelectedLineEnd" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Longitud: <span id="propSelectedLineLength" class="coordinate-value">--</span> m
+                </p>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarLineaSeleccionadaCad()"
+                    >
+                        Eliminar línea
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    La línea referencia sus puntos extremos. Si editas P1 o P2, la longitud y el dibujo se actualizan automáticamente.
                 </div>
             </div>
 
@@ -2209,9 +2249,7 @@
                 zoomPorcentaje;
 
             const nombreHerramienta =
-                projectState.ui.activeTool === "point"
-                    ? "Crear Punto"
-                    : "Seleccionar";
+                nombreHerramientaCad(projectState.ui.activeTool);
 
             document.getElementById("propCadTool").textContent =
                 nombreHerramienta;
@@ -2220,13 +2258,20 @@
 
             const puntoSeleccionado =
                 GeoFEMGeometry.puntoSeleccionado(projectState);
+            const lineaSeleccionada =
+                GeoFEMGeometry.lineaSeleccionada(projectState);
             const vacioSeleccion =
                 document.getElementById("propSelectionEmpty");
             const detallePunto =
                 document.getElementById("propSelectionPoint");
+            const detalleLinea =
+                document.getElementById("propSelectionLine");
+
+            vacioSeleccion.style.display = "none";
+            detallePunto.style.display = "none";
+            detalleLinea.style.display = "none";
 
             if(puntoSeleccionado){
-                vacioSeleccion.style.display = "none";
                 detallePunto.style.display = "block";
                 document.getElementById("propSelectedPointId").textContent =
                     puntoSeleccionado.id;
@@ -2234,9 +2279,22 @@
                     puntoSeleccionado.x.toFixed(3);
                 document.getElementById("inputSelectedPointY").value =
                     puntoSeleccionado.y.toFixed(3);
+            } else if(lineaSeleccionada){
+                detalleLinea.style.display = "block";
+                document.getElementById("propSelectedLineId").textContent =
+                    lineaSeleccionada.id;
+                document.getElementById("propSelectedLineStart").textContent =
+                    lineaSeleccionada.startPointId;
+                document.getElementById("propSelectedLineEnd").textContent =
+                    lineaSeleccionada.endPointId;
+                const longitud = GeoFEMGeometry.longitudLinea(
+                    projectState,
+                    lineaSeleccionada
+                );
+                document.getElementById("propSelectedLineLength").textContent =
+                    longitud === null ? "--" : longitud.toFixed(3);
             } else {
                 vacioSeleccion.style.display = "block";
-                detallePunto.style.display = "none";
             }
 
         }
@@ -2325,7 +2383,9 @@
         }
 
         function nombreHerramientaCad(herramienta){
-            return herramienta === "point" ? "Crear Punto" : "Seleccionar";
+            if(herramienta === "point") return "Crear Punto";
+            if(herramienta === "line") return "Crear Línea";
+            return "Seleccionar";
         }
 
         function htmlPanelGeometria(){
@@ -2354,16 +2414,21 @@
                     ✏ Dibujar Estrato · próximamente
                 </button>
 
-                <button class="tool-btn" disabled title="Se construirá en el siguiente bloque CAD">
-                    ✏ Dibujar Línea · próximamente
+                <button
+                    class="tool-btn"
+                    data-cad-tool="line"
+                    onclick="activarHerramientaCad('line')"
+                    title="Haz clic en un punto inicial y luego en un punto final"
+                >
+                    ╱ Crear Línea
                 </button>
 
                 <button
-                    id="btnEliminarPuntoSeleccionado"
+                    id="btnEliminarSeleccionado"
                     class="tool-btn danger-tool"
-                    onclick="eliminarPuntoSeleccionadoCad()"
+                    onclick="eliminarEntidadSeleccionadaCad()"
                     disabled
-                    title="Selecciona un punto para eliminarlo"
+                    title="Selecciona un punto o línea para eliminarlo"
                 >
                     🗑 Eliminar seleccionado
                 </button>
@@ -2387,16 +2452,21 @@
                 herramienta === "point"
             );
             svg.classList.toggle(
+                "tool-line",
+                projectState?.ui?.activeModule === "geometria" &&
+                herramienta === "line"
+            );
+            svg.classList.toggle(
                 "tool-select",
                 projectState?.ui?.activeModule !== "geometria" ||
                 herramienta === "select"
             );
 
             const botonEliminar =
-                document.getElementById("btnEliminarPuntoSeleccionado");
+                document.getElementById("btnEliminarSeleccionado");
             if(botonEliminar){
                 botonEliminar.disabled =
-                    !GeoFEMGeometry.puntoSeleccionado(projectState);
+                    !GeoFEMGeometry.seleccionActual(projectState);
             }
         }
 
@@ -2405,8 +2475,12 @@
                 return;
             }
 
-            if(!["select", "point"].includes(herramienta)){
+            if(!["select", "point", "line"].includes(herramienta)){
                 return;
+            }
+
+            if(herramienta !== "line"){
+                projectState.ui.lineDraftStartPointId = null;
             }
 
             projectState.ui.activeTool = herramienta;
@@ -2486,6 +2560,52 @@
 
             renderizarProjectState();
             console.log("[GeoFEM] Punto eliminado:", resultado.punto);
+        }
+
+        function eliminarLineaSeleccionadaCad(){
+            const linea = GeoFEMGeometry.lineaSeleccionada(projectState);
+            if(!linea){
+                return;
+            }
+
+            const longitud = GeoFEMGeometry.longitudLinea(projectState, linea);
+            const confirmar = window.confirm(
+                `¿Eliminar ${linea.id} (${linea.startPointId} → ${linea.endPointId})` +
+                `${longitud === null ? "" : ` · ${longitud.toFixed(3)} m`}? ` +
+                "Los puntos extremos se conservarán."
+            );
+
+            if(!confirmar){
+                return;
+            }
+
+            const resultado =
+                GeoFEMGeometry.eliminarLineaSeleccionada(projectState);
+
+            if(!resultado.ok){
+                alert("No fue posible eliminar la línea seleccionada.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Línea eliminada:", resultado.linea);
+        }
+
+        function eliminarEntidadSeleccionadaCad(){
+            if(GeoFEMGeometry.puntoSeleccionado(projectState)){
+                eliminarPuntoSeleccionadoCad();
+                return;
+            }
+
+            if(GeoFEMGeometry.lineaSeleccionada(projectState)){
+                eliminarLineaSeleccionadaCad();
+            }
+        }
+
+        function cancelarBorradorLinea(){
+            if(projectState?.ui){
+                projectState.ui.lineDraftStartPointId = null;
+            }
         }
 
         function configurarInteraccionViewportCad(){
@@ -2573,11 +2693,53 @@
                     return;
                 }
 
+                if(herramienta === "line"){
+                    evento.preventDefault();
+                    const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+
+                    if(entidad?.type !== "point"){
+                        return;
+                    }
+
+                    const inicioId = projectState.ui.lineDraftStartPointId;
+                    if(!inicioId){
+                        projectState.ui.lineDraftStartPointId = entidad.id;
+                        GeoFEMGeometry.seleccionarPunto(projectState, entidad.id);
+                        renderizarViewportCad();
+                        console.log(`[GeoFEM] Línea: punto inicial ${entidad.id}`);
+                        return;
+                    }
+
+                    const resultado = GeoFEMGeometry.crearLinea(
+                        projectState,
+                        inicioId,
+                        entidad.id
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "same_point"){
+                            alert("El punto inicial y el punto final deben ser diferentes.");
+                        } else if(resultado.reason === "duplicate"){
+                            alert("Ya existe una línea entre esos dos puntos.");
+                        } else {
+                            alert("No fue posible crear la línea.");
+                        }
+                        return;
+                    }
+
+                    projectState.ui.lineDraftStartPointId = null;
+                    renderizarProjectState();
+                    console.log("[GeoFEM] Línea creada:", resultado.linea);
+                    return;
+                }
+
                 if(herramienta === "select"){
                     const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
 
                     if(entidad?.type === "point"){
                         GeoFEMGeometry.seleccionarPunto(projectState, entidad.id);
+                    } else if(entidad?.type === "line"){
+                        GeoFEMGeometry.seleccionarLinea(projectState, entidad.id);
                     } else {
                         GeoFEMGeometry.limpiarSeleccion(projectState);
                     }
@@ -2647,15 +2809,16 @@
                 }
 
                 if(evento.key === "Escape"){
+                    cancelarBorradorLinea();
                     GeoFEMGeometry.limpiarSeleccion(projectState);
                     renderizarViewportCad();
                     return;
                 }
 
                 if(evento.key === "Delete"){
-                    if(GeoFEMGeometry.puntoSeleccionado(projectState)){
+                    if(GeoFEMGeometry.seleccionActual(projectState)){
                         evento.preventDefault();
-                        eliminarPuntoSeleccionadoCad();
+                        eliminarEntidadSeleccionadaCad();
                     }
                 }
             });
@@ -2840,6 +3003,7 @@ function cambiarModulo(modulo, boton){
 
         if(modulo !== "geometria"){
             projectState.ui.activeTool = "select";
+            projectState.ui.lineDraftStartPointId = null;
         }
     }
 

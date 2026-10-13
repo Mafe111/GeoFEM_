@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.1.0";
+    const STATE_SCHEMA_VERSION = "1.2.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -131,6 +131,7 @@
                 activeModule: "geometria",
                 activeTool: "select",
                 selection: [],
+                lineDraftStartPointId: null,
             },
 
             dirty: false,

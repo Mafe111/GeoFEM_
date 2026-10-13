@@ -1,18 +1,18 @@
 /*
  * GeoFEM - Geometría CAD básica
  * -----------------------------
- * Sprint 1 / Paso 5
+ * Sprint 1 / Paso 6
  *
  * Responsabilidades actuales:
- *   - crear puntos reales en projectState.geometry.points;
- *   - seleccionar / deseleccionar puntos;
- *   - editar coordenadas X/Y de un punto existente;
- *   - eliminar un punto de forma individual;
- *   - dibujar puntos en geometryLayer;
- *   - dibujar el resaltado de selección en selectionLayer.
+ *   - crear, seleccionar, editar y eliminar puntos;
+ *   - crear líneas entre puntos existentes;
+ *   - seleccionar y eliminar líneas;
+ *   - calcular longitud geométrica de líneas;
+ *   - impedir que se elimine un punto referenciado por una línea;
+ *   - dibujar geometría y selección desde projectState.
  *
  * Importante:
- * El SVG NO es la fuente de verdad. Cada círculo se vuelve a generar desde
+ * El SVG NO es la fuente de verdad. Cada entidad se vuelve a generar desde
  * projectState cada vez que cambia el viewport o el modelo.
  */
 
@@ -41,7 +41,14 @@
         return state.geometry.points;
     }
 
-    function siguienteIdPunto(state) {
+    function lineas(state) {
+        if (!state?.geometry || !Array.isArray(state.geometry.lines)) {
+            return [];
+        }
+        return state.geometry.lines;
+    }
+
+    function asegurarNextIds(state) {
         const geometry = state?.geometry;
         if (!geometry) {
             throw new Error("projectState no contiene geometry.");
@@ -51,9 +58,13 @@
             geometry.nextIds = {};
         }
 
-        let numero = Number(geometry.nextIds.point);
+        return geometry.nextIds;
+    }
 
-        // Compatibilidad con estados antiguos que todavía no tienen contador.
+    function siguienteIdPunto(state) {
+        const nextIds = asegurarNextIds(state);
+        let numero = Number(nextIds.point);
+
         if (!Number.isInteger(numero) || numero < 1) {
             numero = puntos(state).reduce((maximo, punto) => {
                 const match = /^P(\d+)$/.exec(String(punto.id));
@@ -61,12 +72,31 @@
             }, 0) + 1;
         }
 
-        geometry.nextIds.point = numero + 1;
+        nextIds.point = numero + 1;
         return `P${numero}`;
+    }
+
+    function siguienteIdLinea(state) {
+        const nextIds = asegurarNextIds(state);
+        let numero = Number(nextIds.line);
+
+        if (!Number.isInteger(numero) || numero < 1) {
+            numero = lineas(state).reduce((maximo, linea) => {
+                const match = /^L(\d+)$/.exec(String(linea.id));
+                return match ? Math.max(maximo, Number(match[1])) : maximo;
+            }, 0) + 1;
+        }
+
+        nextIds.line = numero + 1;
+        return `L${numero}`;
     }
 
     function obtenerPunto(state, id) {
         return puntos(state).find((punto) => String(punto.id) === String(id)) || null;
+    }
+
+    function obtenerLinea(state, id) {
+        return lineas(state).find((linea) => String(linea.id) === String(id)) || null;
     }
 
     function limpiarSeleccion(state) {
@@ -88,16 +118,38 @@
         return punto;
     }
 
-    function puntoSeleccionado(state) {
-        const seleccion = Array.isArray(state?.ui?.selection)
-            ? state.ui.selection[0]
-            : null;
+    function seleccionarLinea(state, id) {
+        const linea = obtenerLinea(state, id);
 
-        if (!seleccion || seleccion.type !== "point") {
+        if (!linea || !state?.ui) {
+            limpiarSeleccion(state);
             return null;
         }
 
+        state.ui.selection = [{type: "line", id: linea.id}];
+        return linea;
+    }
+
+    function seleccionActual(state) {
+        return Array.isArray(state?.ui?.selection)
+            ? state.ui.selection[0] || null
+            : null;
+    }
+
+    function puntoSeleccionado(state) {
+        const seleccion = seleccionActual(state);
+        if (!seleccion || seleccion.type !== "point") {
+            return null;
+        }
         return obtenerPunto(state, seleccion.id);
+    }
+
+    function lineaSeleccionada(state) {
+        const seleccion = seleccionActual(state);
+        if (!seleccion || seleccion.type !== "line") {
+            return null;
+        }
+        return obtenerLinea(state, seleccion.id);
     }
 
     function crearPunto(state, coordenada = {}) {
@@ -113,9 +165,7 @@
 
         state.geometry.points.push(punto);
         seleccionarPunto(state, punto.id);
-
         marcarModificado(state);
-
         return punto;
     }
 
@@ -145,22 +195,99 @@
     }
 
     function lineasQueUsanPunto(state, id) {
-        const lineas = Array.isArray(state?.geometry?.lines)
-            ? state.geometry.lines
-            : [];
-
-        return lineas.filter((linea) => {
+        return lineas(state).filter((linea) => {
             const inicio = linea.startPointId ?? linea.puntoInicialId ?? null;
             const fin = linea.endPointId ?? linea.puntoFinalId ?? null;
             return String(inicio) === String(id) || String(fin) === String(id);
         });
     }
 
+    function existeLineaEntre(state, puntoAId, puntoBId) {
+        return lineas(state).some((linea) => {
+            const inicio = String(linea.startPointId);
+            const fin = String(linea.endPointId);
+            const a = String(puntoAId);
+            const b = String(puntoBId);
+            return (inicio === a && fin === b) || (inicio === b && fin === a);
+        });
+    }
+
+    function crearLinea(state, startPointId, endPointId) {
+        const inicio = obtenerPunto(state, startPointId);
+        const fin = obtenerPunto(state, endPointId);
+
+        if (!inicio || !fin) {
+            return {ok: false, reason: "point_not_found", linea: null};
+        }
+
+        if (String(inicio.id) === String(fin.id)) {
+            return {ok: false, reason: "same_point", linea: null};
+        }
+
+        if (existeLineaEntre(state, inicio.id, fin.id)) {
+            return {ok: false, reason: "duplicate", linea: null};
+        }
+
+        const linea = {
+            id: siguienteIdLinea(state),
+            startPointId: inicio.id,
+            endPointId: fin.id,
+        };
+
+        state.geometry.lines.push(linea);
+        seleccionarLinea(state, linea.id);
+        marcarModificado(state);
+
+        return {ok: true, reason: null, linea};
+    }
+
+    function longitudLinea(state, lineaOId) {
+        const linea = typeof lineaOId === "object"
+            ? lineaOId
+            : obtenerLinea(state, lineaOId);
+
+        if (!linea) {
+            return null;
+        }
+
+        const inicio = obtenerPunto(state, linea.startPointId);
+        const fin = obtenerPunto(state, linea.endPointId);
+        if (!inicio || !fin) {
+            return null;
+        }
+
+        return Math.hypot(fin.x - inicio.x, fin.y - inicio.y);
+    }
+
+    function eliminarLinea(state, id) {
+        const lista = lineas(state);
+        const indice = lista.findIndex((linea) => String(linea.id) === String(id));
+
+        if (indice < 0) {
+            return {ok: false, reason: "not_found", linea: null};
+        }
+
+        const [eliminada] = lista.splice(indice, 1);
+        const seleccion = seleccionActual(state);
+        if (seleccion?.type === "line" && String(seleccion.id) === String(id)) {
+            limpiarSeleccion(state);
+        }
+
+        marcarModificado(state);
+        return {ok: true, reason: null, linea: eliminada};
+    }
+
+    function eliminarLineaSeleccionada(state) {
+        const linea = lineaSeleccionada(state);
+        if (!linea) {
+            return {ok: false, reason: "no_selection", linea: null};
+        }
+        return eliminarLinea(state, linea.id);
+    }
+
     function eliminarPunto(state, id, opciones = {}) {
         const lista = puntos(state);
-        const indice = lista.findIndex(
-            (punto) => String(punto.id) === String(id)
-        );
+        const indice = lista.findIndex((punto) => String(punto.id) === String(id));
 
         if (indice < 0) {
             return {ok: false, reason: "not_found", referencias: []};
@@ -168,22 +295,16 @@
 
         const referencias = lineasQueUsanPunto(state, id);
         if (referencias.length > 0 && opciones.force !== true) {
-            return {
-                ok: false,
-                reason: "referenced",
-                referencias,
-            };
+            return {ok: false, reason: "referenced", referencias};
         }
 
         const [eliminado] = lista.splice(indice, 1);
-
         const seleccionado = puntoSeleccionado(state);
         if (seleccionado && String(seleccionado.id) === String(id)) {
             limpiarSeleccion(state);
         }
 
         marcarModificado(state);
-
         return {ok: true, reason: null, punto: eliminado, referencias};
     }
 
@@ -200,6 +321,10 @@
             return 0;
         }
 
+        if (lineas(state).length > 0) {
+            return 0;
+        }
+
         const cantidad = state.geometry.points.length;
         state.geometry.points = [];
         limpiarSeleccion(state);
@@ -213,11 +338,9 @@
 
     function crearElementoSvg(nombre, atributos = {}) {
         const elemento = document.createElementNS(SVG_NS, nombre);
-
         Object.entries(atributos).forEach(([clave, valor]) => {
             elemento.setAttribute(clave, String(valor));
         });
-
         return elemento;
     }
 
@@ -227,6 +350,50 @@
         }
 
         layer.replaceChildren();
+
+        // Las líneas se dibujan primero para que los puntos queden visualmente encima.
+        lineas(state).forEach((linea) => {
+            const inicio = obtenerPunto(state, linea.startPointId);
+            const fin = obtenerPunto(state, linea.endPointId);
+            if (!inicio || !fin) {
+                return;
+            }
+
+            const a = global.GeoFEMViewport.modelToScreen(inicio, viewport);
+            const b = global.GeoFEMViewport.modelToScreen(fin, viewport);
+
+            const visible = crearElementoSvg("line", {
+                x1: a.x,
+                y1: a.y,
+                x2: b.x,
+                y2: b.y,
+                stroke: "#0f766e",
+                "stroke-width": 2.5,
+                "vector-effect": "non-scaling-stroke",
+                "pointer-events": "none",
+            });
+            layer.appendChild(visible);
+
+            // Hit area transparente más gruesa: facilita seleccionar una línea fina.
+            const hit = crearElementoSvg("line", {
+                x1: a.x,
+                y1: a.y,
+                x2: b.x,
+                y2: b.y,
+                stroke: "transparent",
+                "stroke-width": 14,
+                "vector-effect": "non-scaling-stroke",
+                "data-geofem-entity-type": "line",
+                "data-geofem-entity-id": linea.id,
+            });
+            hit.style.cursor = "pointer";
+
+            const titulo = crearElementoSvg("title");
+            const longitud = longitudLinea(state, linea);
+            titulo.textContent = `${linea.id}: ${inicio.id} → ${fin.id} · ${longitud?.toFixed(3) ?? "--"} m`;
+            hit.appendChild(titulo);
+            layer.appendChild(hit);
+        });
 
         puntos(state).forEach((punto) => {
             const pantalla = global.GeoFEMViewport.modelToScreen(punto, viewport);
@@ -244,7 +411,6 @@
             });
 
             circulo.style.cursor = "pointer";
-
             const titulo = crearElementoSvg("title");
             titulo.textContent = `${punto.id}: (${punto.x.toFixed(3)}, ${punto.y.toFixed(3)}) m`;
             circulo.appendChild(titulo);
@@ -260,14 +426,9 @@
         layer.replaceChildren();
 
         const punto = puntoSeleccionado(state);
-        if (!punto) {
-            return;
-        }
-
-        const pantalla = global.GeoFEMViewport.modelToScreen(punto, viewport);
-
-        layer.appendChild(
-            crearElementoSvg("circle", {
+        if (punto) {
+            const pantalla = global.GeoFEMViewport.modelToScreen(punto, viewport);
+            layer.appendChild(crearElementoSvg("circle", {
                 cx: pantalla.x,
                 cy: pantalla.y,
                 r: 10,
@@ -277,11 +438,8 @@
                 "stroke-dasharray": "4 3",
                 "vector-effect": "non-scaling-stroke",
                 "pointer-events": "none",
-            })
-        );
-
-        layer.appendChild(
-            crearElementoSvg("line", {
+            }));
+            layer.appendChild(crearElementoSvg("line", {
                 x1: pantalla.x - 14,
                 y1: pantalla.y,
                 x2: pantalla.x + 14,
@@ -290,11 +448,8 @@
                 "stroke-width": 1,
                 "vector-effect": "non-scaling-stroke",
                 "pointer-events": "none",
-            })
-        );
-
-        layer.appendChild(
-            crearElementoSvg("line", {
+            }));
+            layer.appendChild(crearElementoSvg("line", {
                 x1: pantalla.x,
                 y1: pantalla.y - 14,
                 x2: pantalla.x,
@@ -303,8 +458,31 @@
                 "stroke-width": 1,
                 "vector-effect": "non-scaling-stroke",
                 "pointer-events": "none",
-            })
-        );
+            }));
+            return;
+        }
+
+        const linea = lineaSeleccionada(state);
+        if (linea) {
+            const inicio = obtenerPunto(state, linea.startPointId);
+            const fin = obtenerPunto(state, linea.endPointId);
+            if (!inicio || !fin) {
+                return;
+            }
+            const a = global.GeoFEMViewport.modelToScreen(inicio, viewport);
+            const b = global.GeoFEMViewport.modelToScreen(fin, viewport);
+            layer.appendChild(crearElementoSvg("line", {
+                x1: a.x,
+                y1: a.y,
+                x2: b.x,
+                y2: b.y,
+                stroke: "#f59e0b",
+                "stroke-width": 5,
+                "stroke-dasharray": "8 5",
+                "vector-effect": "non-scaling-stroke",
+                "pointer-events": "none",
+            }));
+        }
     }
 
     function entidadDesdeTarget(target) {
@@ -329,6 +507,14 @@
         obtenerPunto,
         seleccionarPunto,
         puntoSeleccionado,
+        crearLinea,
+        obtenerLinea,
+        seleccionarLinea,
+        lineaSeleccionada,
+        longitudLinea,
+        existeLineaEntre,
+        eliminarLinea,
+        eliminarLineaSeleccionada,
         limpiarSeleccion,
         lineasQueUsanPunto,
         eliminarPunto,
@@ -337,6 +523,7 @@
         renderGeometry,
         renderSelection,
         entidadDesdeTarget,
+        seleccionActual,
     };
 
     global.GeoFEMGeometry = api;
