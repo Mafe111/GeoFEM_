@@ -710,7 +710,14 @@
 
         .workspace-body{
             display:flex;
-            height:calc(100vh - 72px);
+
+            /*
+             * El viewport y los paneles deben compartir el alto visible con
+             * la barra de estado. Antes se restaban solo los 72 px del menú
+             * superior y la barra inferior (42 px) quedaba fuera de pantalla.
+             */
+            height:calc(100vh - 72px - 42px);
+            min-height:0;
         }
 
         .sidebar{
@@ -755,6 +762,20 @@
             background:#b7ece0;
         }
 
+        .tool-btn.active-tool{
+            background:#ccfbf1;
+            border-color:#2dd4bf;
+            color:#0f766e;
+            font-weight:700;
+            box-shadow:0 0 0 2px rgba(45,212,191,0.10);
+        }
+
+        .tool-btn:disabled{
+            cursor:not-allowed;
+            opacity:0.55;
+            background:#f8fafc;
+        }
+
         .cad-area{
             flex:1;
 
@@ -793,6 +814,8 @@
     border-left:1px solid #dbe4ee;
 
     padding:18px;
+    overflow-y:auto;
+    min-height:0;
 
 }
 
@@ -828,7 +851,229 @@
 
     width:100%;
     height:100%;
+    cursor:crosshair;
+    touch-action:none;
+    user-select:none;
 
+}
+
+#cadSvg.is-panning{
+    cursor:grabbing;
+}
+
+#cadSvg.tool-select{
+    cursor:default;
+}
+
+#cadSvg.tool-point{
+    cursor:crosshair;
+}
+
+#cadSvg.tool-line{
+    cursor:crosshair;
+}
+
+#cadSvg.tool-polyline{
+    cursor:crosshair;
+}
+
+#cadSvg.tool-region{
+    cursor:crosshair;
+}
+
+/* Capas del viewport CAD. En este Sprint son una estructura vacía
+   preparada para geometría, malla, restricciones y resultados. */
+#viewportContent > g{
+    vector-effect:non-scaling-stroke;
+}
+
+#cadEmptyState{
+    pointer-events:none;
+    user-select:none;
+}
+
+.state-version{
+    display:inline-block;
+    margin-top:8px;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#e6fffa;
+    color:#0f766e;
+    font-size:11px;
+    font-weight:700;
+}
+
+.coordinate-value{
+    font-family:Consolas, "Courier New", monospace;
+    font-variant-numeric:tabular-nums;
+}
+
+.viewport-reset-btn{
+    width:100%;
+    margin-top:8px;
+    border:1px solid #cbd5e1;
+    border-radius:10px;
+    padding:8px 10px;
+    background:white;
+    color:#334155;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.viewport-reset-btn:hover{
+    border-color:#56bca2;
+    background:#f0fdfa;
+    color:#0f766e;
+}
+
+.viewport-hint{
+    margin-top:10px;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.45;
+}
+
+.snap-settings{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px solid #e2e8f0;
+}
+
+.snap-settings-title{
+    font-size:12px;
+    font-weight:800;
+    color:#334155;
+    margin-bottom:8px;
+}
+
+.snap-option{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    margin:6px 0;
+    font-size:12px;
+    color:#475569;
+}
+
+.snap-option input[type="checkbox"]{
+    accent-color:#0f766e;
+}
+
+.snap-tolerance-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-top:8px;
+    font-size:12px;
+    color:#475569;
+}
+
+.snap-tolerance-row input{
+    width:72px;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    padding:5px 7px;
+    font-family:Consolas, "Courier New", monospace;
+}
+
+.snap-status-badge{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    background:#ecfeff;
+    color:#0e7490;
+    font-size:11px;
+    font-weight:800;
+}
+
+.point-editor-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin:10px 0 12px;
+}
+
+.point-editor-field label{
+    display:block;
+    margin-bottom:5px;
+    color:#475569;
+    font-size:12px;
+    font-weight:700;
+}
+
+.point-editor-field input{
+    width:100%;
+    box-sizing:border-box;
+    border:1px solid #cbd5e1;
+    border-radius:9px;
+    padding:8px 9px;
+    background:#ffffff;
+    color:#0f172a;
+    font-family:Consolas, "Courier New", monospace;
+}
+
+.point-editor-field input:focus{
+    outline:none;
+    border-color:#14b8a6;
+    box-shadow:0 0 0 2px rgba(20,184,166,0.12);
+}
+
+.property-action-row{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+}
+
+.property-action-btn{
+    flex:1;
+    border:1px solid #cbd5e1;
+    border-radius:9px;
+    padding:8px 9px;
+    background:#ffffff;
+    color:#334155;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.property-action-btn:hover{
+    border-color:#14b8a6;
+    background:#f0fdfa;
+    color:#0f766e;
+}
+
+.property-action-btn.danger{
+    border-color:#fecaca;
+    color:#b91c1c;
+    background:#fff7f7;
+}
+
+.property-action-btn.danger:hover{
+    border-color:#ef4444;
+    background:#fef2f2;
+    color:#991b1b;
+}
+
+.selection-hint{
+    margin-top:8px;
+    font-size:11px;
+    line-height:1.4;
+    color:#64748b;
+}
+
+.tool-btn.danger-tool{
+    border-color:#fecaca;
+    color:#b91c1c;
+}
+
+.tool-btn.danger-tool:hover:not(:disabled){
+    background:#fef2f2;
+    border-color:#ef4444;
+}
+
+
+#coordinateReferenceLayer{
+    pointer-events:none;
 }
 
 .status-bar{
@@ -1302,20 +1547,65 @@
 
         <div id="toolPanel">
 
-            <button class="tool-btn">
-                📁 Importar DXF
+            <button
+                class="tool-btn active-tool"
+                data-cad-tool="select"
+                onclick="activarHerramientaCad('select')"
+            >
+                ↖ Seleccionar
             </button>
 
-            <button class="tool-btn">
-                ✏ Dibujar Estrato
+            <button
+                class="tool-btn"
+                data-cad-tool="point"
+                onclick="activarHerramientaCad('point')"
+            >
+                • Crear Punto
             </button>
 
-            <button class="tool-btn">
-                ✏ Dibujar Línea
+            <button class="tool-btn" disabled title="Se integrará en un paso posterior">
+                📁 Importar DXF · próximamente
             </button>
 
-            <button class="tool-btn">
-                🧹 Limpiar
+            <button class="tool-btn" disabled title="Se construirá después de validar puntos y líneas">
+                ✏ Dibujar Estrato · próximamente
+            </button>
+
+            <button
+                class="tool-btn"
+                data-cad-tool="line"
+                onclick="activarHerramientaCad('line')"
+                title="Haz clic en un punto inicial y luego en un punto final"
+            >
+                ╱ Crear Línea
+            </button>
+
+            <button
+                class="tool-btn"
+                data-cad-tool="polyline"
+                onclick="activarHerramientaCad('polyline')"
+                title="Selecciona puntos consecutivos y pulsa Enter para finalizar"
+            >
+                ⌁ Crear Polilínea
+            </button>
+
+            <button
+                class="tool-btn"
+                data-cad-tool="region"
+                onclick="activarHerramientaCad('region')"
+                title="Selecciona al menos tres puntos y vuelve al primero para cerrar"
+            >
+                ◇ Crear Región
+            </button>
+
+            <button
+                id="btnEliminarSeleccionado"
+                class="tool-btn danger-tool"
+                onclick="eliminarEntidadSeleccionadaCad()"
+                disabled
+                title="Selecciona un punto, línea, polilínea o región para eliminarlo"
+            >
+                🗑 Eliminar seleccionado
             </button>
 
         </div>
@@ -1332,59 +1622,64 @@
                 id="cadSvg"
                 viewBox="0 0 1200 800"
                 preserveAspectRatio="xMidYMid meet"
+                aria-label="Viewport CAD de GeoFEM"
             >
 
-                <defs>
-
-                    <pattern
-                        id="grid"
-                        width="25"
-                        height="25"
-                        patternUnits="userSpaceOnUse"
-                    >
-
-                        <path
-                            d="M 25 0 L 0 0 0 25"
-                            fill="none"
-                            stroke="#e2e8f0"
-                            stroke-width="1"
-                        />
-
-                    </pattern>
-
-                </defs>
-
+                <!-- Fondo blanco y grid dinámico generado desde viewport.js. -->
                 <rect
-                    width="100%"
-                    height="100%"
-                    fill="url(#grid)"
+                    id="cadBackground"
+                    x="0"
+                    y="0"
+                    width="1200"
+                    height="800"
+                    fill="#ffffff"
                 />
+                <g id="gridLayer" pointer-events="none"></g>
 
-                <!-- TALUD DEMO -->
+                <!--
+                    CONTENIDO DEL MODELO
+                    --------------------
+                    Estas capas NO son la fuente de verdad. Se dibujan a partir
+                    de projectState. El orden también define qué queda encima.
+                -->
+                <g id="viewportContent">
+                    <g id="regionLayer"></g>
+                    <g id="geometryLayer"></g>
+                    <g id="meshLayer"></g>
+                    <g id="boundaryLayer"></g>
+                    <g id="resultLayer"></g>
+                    <g id="regionSelectionLayer"></g>
+                    <g id="selectionLayer"></g>
+                </g>
 
-                <polygon
-                    points="
-                    150,550
-                    500,300
-                    850,300
-                    850,650
-                    150,650
-                    "
-                    fill="#d4f4eb"
-                    stroke="#0d4557"
-                    stroke-width="3"
-                />
+                <!-- Elementos de interfaz que no forman parte del modelo FEM. -->
+                <g id="overlayLayer">
+                    <!-- Ejes X/Y de referencia. No pertenecen a la geometría. -->
+                    <g id="coordinateReferenceLayer"></g>
+                    <g id="snapLayer" pointer-events="none"></g>
 
-                <!-- TEXTO -->
-
-                <text
-                    x="500"
-                    y="200"
-                    font-size="24"
-                    fill="#64748b"
-                >
-                    GeoFEM Workspace
-                </text>
+                    <text
+                        id="cadEmptyState"
+                        x="600"
+                        y="390"
+                        text-anchor="middle"
+                        font-size="24"
+                        font-weight="700"
+                        fill="#64748b"
+                    >
+                        Proyecto sin geometría
+                    </text>
+                    <text
+                        id="cadEmptyStateSubtitle"
+                        x="600"
+                        y="425"
+                        text-anchor="middle"
+                        font-size="14"
+                        fill="#94a3b8"
+                    >
+                        El modelo CAD se generará desde projectState
+                    </text>
+                </g>
 
             </svg>
 
@@ -1402,39 +1697,360 @@
 
         <div class="property-card">
 
-            <h4>
-                Proyecto
-            </h4>
+            <h4>Proyecto activo</h4>
 
             <p>
-                Nombre:
-                <span id="propNombre">
-                    Talud Principal
-                </span>
+                ID:
+                <span id="propProyectoId">--</span>
             </p>
 
             <p>
-                Estado:
-                Activo
+                Nombre:
+                <span id="propNombre">Sin proyecto</span>
+            </p>
+
+            <p>
+                Código:
+                <span id="propCodigo">--</span>
+            </p>
+
+            <span
+                class="state-version"
+                id="propStateVersion"
+            >
+                State --
+            </span>
+
+            <p style="margin-top:12px;">
+                Edición local:
+                <span id="propDirtyState">Sin cambios</span>
             </p>
 
         </div>
 
         <div class="property-card">
 
-            <h4>
-                Geometría
-            </h4>
+            <h4>Modelo interno</h4>
 
             <p>
-                Estratos:
-                1
+                Puntos:
+                <span id="propPuntos">0</span>
             </p>
 
             <p>
-                Polígonos:
-                1
+                Líneas:
+                <span id="propLineas">0</span>
             </p>
+
+            <p>
+                Polilíneas:
+                <span id="propPolilineas">0</span>
+            </p>
+
+            <p>
+                Regiones:
+                <span id="propRegiones">0</span>
+            </p>
+
+            <p>
+                Materiales:
+                <span id="propMateriales">0</span>
+            </p>
+
+        </div>
+
+        <div class="property-card">
+
+            <h4>Selección CAD</h4>
+
+            <div id="propSelectionEmpty">
+                <p>Sin selección.</p>
+                <p style="font-size:12px; color:#64748b;">
+                    Usa ↖ Seleccionar y haz clic sobre un punto, una línea, una polilínea o una región.
+                </p>
+            </div>
+
+            <div id="propSelectionPoint" style="display:none;">
+                <p>
+                    Tipo: <strong>Punto</strong>
+                </p>
+                <p>
+                    ID: <span id="propSelectedPointId" class="coordinate-value">--</span>
+                </p>
+
+                <div class="point-editor-grid">
+                    <div class="point-editor-field">
+                        <label for="inputSelectedPointX">X (m)</label>
+                        <input
+                            id="inputSelectedPointX"
+                            type="number"
+                            step="any"
+                            inputmode="decimal"
+                            onkeydown="if(event.key==='Enter'){actualizarPuntoSeleccionadoDesdePanel();}"
+                        />
+                    </div>
+                    <div class="point-editor-field">
+                        <label for="inputSelectedPointY">Y (m)</label>
+                        <input
+                            id="inputSelectedPointY"
+                            type="number"
+                            step="any"
+                            inputmode="decimal"
+                            onkeydown="if(event.key==='Enter'){actualizarPuntoSeleccionadoDesdePanel();}"
+                        />
+                    </div>
+                </div>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="actualizarPuntoSeleccionadoDesdePanel()"
+                    >
+                        Aplicar coordenadas
+                    </button>
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarPuntoSeleccionadoCad()"
+                    >
+                        Eliminar punto
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    El ID del punto se conserva al editar. También puedes usar la tecla Supr para eliminar la selección.
+                </div>
+            </div>
+
+            <div id="propSelectionLine" style="display:none;">
+                <p>
+                    Tipo: <strong>Línea</strong>
+                </p>
+                <p>
+                    ID: <span id="propSelectedLineId" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Punto inicial: <span id="propSelectedLineStart" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Punto final: <span id="propSelectedLineEnd" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Longitud: <span id="propSelectedLineLength" class="coordinate-value">--</span> m
+                </p>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarLineaSeleccionadaCad()"
+                    >
+                        Eliminar línea
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    La línea referencia sus puntos extremos. Si editas P1 o P2, la longitud y el dibujo se actualizan automáticamente.
+                </div>
+            </div>
+
+            <div id="propSelectionPolyline" style="display:none;">
+                <p>
+                    Tipo: <strong>Polilínea</strong>
+                </p>
+                <p>
+                    ID: <span id="propSelectedPolylineId" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Vértices: <span id="propSelectedPolylineVertices" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Longitud total: <span id="propSelectedPolylineLength" class="coordinate-value">--</span> m
+                </p>
+                <p style="font-size:12px; line-height:1.45;">
+                    Secuencia: <span id="propSelectedPolylineSequence" class="coordinate-value">--</span>
+                </p>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarPolilineaSeleccionadaCad()"
+                    >
+                        Eliminar polilínea
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    La polilínea referencia una secuencia ordenada de puntos. Editar un vértice actualiza automáticamente su forma y longitud.
+                </div>
+            </div>
+
+            <div id="propSelectionRegion" style="display:none;">
+                <p>
+                    Tipo: <strong>Región cerrada</strong>
+                </p>
+                <p>
+                    ID: <span id="propSelectedRegionId" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Vértices: <span id="propSelectedRegionVertices" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Área: <span id="propSelectedRegionArea" class="coordinate-value">--</span> m²
+                </p>
+                <p>
+                    Perímetro: <span id="propSelectedRegionPerimeter" class="coordinate-value">--</span> m
+                </p>
+                <p>
+                    Sentido: <span id="propSelectedRegionOrientation" class="coordinate-value">--</span>
+                </p>
+                <p style="font-size:12px; line-height:1.45;">
+                    Contorno: <span id="propSelectedRegionSequence" class="coordinate-value">--</span>
+                </p>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="iniciarInsercionVerticeRegionCad()"
+                        title="Haz clic sobre un borde de la región para insertar un nuevo vértice"
+                    >
+                        + Vértice en borde
+                    </button>
+                    <button
+                        class="property-action-btn"
+                        onclick="iniciarQuitarVerticeRegionCad()"
+                        title="Haz clic sobre un vértice para quitarlo del contorno; el punto se conserva"
+                    >
+                        − Vértice del contorno
+                    </button>
+                </div>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="invertirRegionSeleccionadaCad()"
+                    >
+                        ⇄ Invertir sentido
+                    </button>
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarRegionSeleccionadaCad()"
+                    >
+                        Eliminar región
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    La región está cerrada de forma implícita. Puedes insertar o quitar vértices sin borrar los puntos independientes. Una edición que genere área cero o autointersecciones será rechazada.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="property-card">
+
+            <h4>Viewport CAD</h4>
+
+            <p>
+                Herramienta:
+                <span id="propCadTool">Seleccionar</span>
+            </p>
+
+            <p>
+                Unidades:
+                <span id="propUnidadLongitud">m</span>
+            </p>
+
+            <p>
+                Escala:
+                <span id="propEscalaViewport" class="coordinate-value">20.00</span>
+                SVG/m
+            </p>
+
+            <p>
+                Origen SVG:
+                <span id="propOrigenViewport" class="coordinate-value">(100, 700)</span>
+            </p>
+
+            <p>
+                Convención Y:
+                <span>positiva hacia arriba</span>
+            </p>
+
+            <p>
+                Zoom:
+                <span id="propZoomViewport" class="coordinate-value">100%</span>
+            </p>
+
+            <p>
+                Grid menor:
+                <span id="propGridViewport" class="coordinate-value">1.00 m</span>
+            </p>
+
+            <p>
+                Pan SVG:
+                <span id="propPanViewport" class="coordinate-value">(0.0, 0.0)</span>
+            </p>
+
+            <div class="snap-settings">
+                <div class="snap-settings-title">Precisión CAD · Snap</div>
+
+                <label class="snap-option">
+                    <input
+                        id="snapEnabled"
+                        type="checkbox"
+                        onchange="actualizarConfiguracionSnapDesdePanel()"
+                    />
+                    Activar snap <span style="color:#94a3b8;">(F3)</span>
+                </label>
+
+                <label class="snap-option">
+                    <input
+                        id="snapPoints"
+                        type="checkbox"
+                        onchange="actualizarConfiguracionSnapDesdePanel()"
+                    />
+                    Vértices existentes
+                </label>
+
+                <label class="snap-option">
+                    <input
+                        id="snapGrid"
+                        type="checkbox"
+                        onchange="actualizarConfiguracionSnapDesdePanel()"
+                    />
+                    Grid visible
+                </label>
+
+                <div class="snap-tolerance-row">
+                    <label for="snapTolerancePx">Tolerancia</label>
+                    <div>
+                        <input
+                            id="snapTolerancePx"
+                            type="number"
+                            min="2"
+                            max="40"
+                            step="1"
+                            onchange="actualizarConfiguracionSnapDesdePanel()"
+                        /> px
+                    </div>
+                </div>
+
+                <p style="margin-top:9px;">
+                    Candidato:
+                    <span id="propSnapCandidate" class="snap-status-badge">--</span>
+                </p>
+            </div>
+
+            <button
+                class="viewport-reset-btn"
+                type="button"
+                onclick="restablecerVistaCad()"
+            >
+                ↺ Restablecer vista
+            </button>
+
+            <div class="viewport-hint">
+                Rueda: zoom · Botón central o Shift + arrastrar: pan
+            </div>
 
         </div>
 
@@ -1478,6 +2094,36 @@
 
     <div>
 
+        Cursor:
+        X <span id="txt-cursor-x" class="coordinate-value">--</span> m
+        ·
+        Y <span id="txt-cursor-y" class="coordinate-value">--</span> m
+
+    </div>
+
+    <div>
+
+        Zoom:
+        <span id="txt-zoom" class="coordinate-value">100%</span>
+
+    </div>
+
+    <div>
+
+        Herramienta:
+        <span id="txt-tool">Seleccionar</span>
+
+    </div>
+
+    <div>
+
+        Snap:
+        <span id="txt-snap" class="coordinate-value">--</span>
+
+    </div>
+
+    <div>
+
         Estado:
 
         <span id="txt-status">
@@ -1494,16 +2140,28 @@
          JAVASCRIPT
     ====================================================== -->
 
+    <!-- Modelo interno y transformaciones CAD. Deben cargarse antes del JS inline. -->
+    <script src="js/project-state.js"></script>
+    <script src="js/viewport.js"></script>
+    <script src="js/cad-geometry.js"></script>
+    <script src="js/cad-regions.js"></script>
+    <script src="js/cad-snap.js"></script>
+
     <script>
 
         /* =====================================================
-           ESTADO BÁSICO DEL PROYECTO
+           ESTADO CENTRAL DE GEOFEM
         ====================================================== */
 
-        // Sprint 0: por ahora guardamos únicamente los metadatos del proyecto
-        // abierto. En el Sprint CAD este objeto evolucionará al projectState.
+        // `proyectoActivo` se conserva temporalmente por compatibilidad con
+        // el Dashboard del Sprint 0. La fuente de verdad del Workspace pasa a
+        // ser `projectState`.
         let proyectoActivo = null;
         let proyectosDashboard = [];
+
+        // Estado vacío inicial. Al abrir/crear un proyecto se reemplaza por un
+        // estado nuevo asociado al ID real de MySQL.
+        let projectState = GeoFEMState.crearProjectState();
 
         /* =====================================================
            FECHA AUTOMÁTICA
@@ -1764,17 +2422,1363 @@
 
         }
 
+        function limpiarCapaSvg(idCapa){
+
+            const capa = document.getElementById(idCapa);
+
+            if(capa){
+                capa.replaceChildren();
+            }
+
+        }
+
+        function actualizarPanelDesdeProjectState(){
+
+            const resumen = GeoFEMState.resumenProjectState(projectState);
+            const proyecto = projectState.project;
+
+            document.getElementById("propProyectoId").textContent =
+                proyecto.id ?? "--";
+            document.getElementById("propNombre").textContent =
+                proyecto.nombre || "Sin proyecto";
+            document.getElementById("propCodigo").textContent =
+                proyecto.codigo || "--";
+            document.getElementById("propStateVersion").textContent =
+                `State ${projectState.schemaVersion}`;
+            document.getElementById("propDirtyState").textContent =
+                projectState.dirty
+                    ? "Cambios locales sin guardar"
+                    : "Sin cambios";
+
+            document.getElementById("propPuntos").textContent =
+                resumen.geometry.points;
+            document.getElementById("propLineas").textContent =
+                resumen.geometry.lines;
+            document.getElementById("propPolilineas").textContent =
+                resumen.geometry.polylines;
+            document.getElementById("propRegiones").textContent =
+                resumen.geometry.regions;
+            document.getElementById("propMateriales").textContent =
+                resumen.materials;
+
+            document.getElementById("txt-nodos").textContent =
+                resumen.nodes;
+            document.getElementById("txt-elementos").textContent =
+                resumen.elements;
+            document.getElementById("txt-fos").textContent =
+                projectState.results.fos ?? "--";
+
+            const viewport = projectState.viewport;
+            document.getElementById("propUnidadLongitud").textContent =
+                projectState.units.longitud;
+            document.getElementById("propEscalaViewport").textContent =
+                GeoFEMViewport.escalaEfectiva(viewport).toFixed(2);
+            document.getElementById("propOrigenViewport").textContent =
+                `(${viewport.originSvg.x}, ${viewport.originSvg.y})`;
+
+            const zoomPorcentaje = `${(viewport.zoom * 100).toFixed(0)}%`;
+            const pasoGrid = GeoFEMViewport.gridSpacingModel(viewport);
+
+            document.getElementById("propZoomViewport").textContent =
+                zoomPorcentaje;
+            document.getElementById("propGridViewport").textContent =
+                `${pasoGrid.toFixed(2)} ${projectState.units.longitud}`;
+            document.getElementById("propPanViewport").textContent =
+                `(${viewport.pan.x.toFixed(1)}, ${viewport.pan.y.toFixed(1)})`;
+            document.getElementById("txt-zoom").textContent =
+                zoomPorcentaje;
+
+            const snap = viewport.snap || {};
+            document.getElementById("snapEnabled").checked = snap.enabled !== false;
+            document.getElementById("snapPoints").checked = snap.points !== false;
+            document.getElementById("snapGrid").checked = snap.grid !== false;
+            document.getElementById("snapTolerancePx").value =
+                Number.isFinite(Number(snap.tolerancePx))
+                    ? Number(snap.tolerancePx)
+                    : 12;
+
+            const snapCandidate = GeoFEMSnap.candidatoActual(projectState);
+            const snapLabel = GeoFEMSnap.etiquetaCandidato(snapCandidate);
+            document.getElementById("propSnapCandidate").textContent = snapLabel;
+            document.getElementById("txt-snap").textContent =
+                snap.enabled === false ? "OFF" : snapLabel;
+
+            const nombreHerramienta =
+                nombreHerramientaCad(projectState.ui.activeTool);
+
+            document.getElementById("propCadTool").textContent =
+                nombreHerramienta;
+            document.getElementById("txt-tool").textContent =
+                nombreHerramienta;
+
+            const puntoSeleccionado =
+                GeoFEMGeometry.puntoSeleccionado(projectState);
+            const lineaSeleccionada =
+                GeoFEMGeometry.lineaSeleccionada(projectState);
+            const polilineaSeleccionada =
+                GeoFEMGeometry.polilineaSeleccionada(projectState);
+            const regionSeleccionada =
+                GeoFEMRegions.regionSeleccionada(projectState);
+            const vacioSeleccion =
+                document.getElementById("propSelectionEmpty");
+            const detallePunto =
+                document.getElementById("propSelectionPoint");
+            const detalleLinea =
+                document.getElementById("propSelectionLine");
+            const detallePolilinea =
+                document.getElementById("propSelectionPolyline");
+            const detalleRegion =
+                document.getElementById("propSelectionRegion");
+
+            vacioSeleccion.style.display = "none";
+            detallePunto.style.display = "none";
+            detalleLinea.style.display = "none";
+            detallePolilinea.style.display = "none";
+            detalleRegion.style.display = "none";
+
+            if(puntoSeleccionado){
+                detallePunto.style.display = "block";
+                document.getElementById("propSelectedPointId").textContent =
+                    puntoSeleccionado.id;
+                document.getElementById("inputSelectedPointX").value =
+                    puntoSeleccionado.x.toFixed(3);
+                document.getElementById("inputSelectedPointY").value =
+                    puntoSeleccionado.y.toFixed(3);
+            } else if(lineaSeleccionada){
+                detalleLinea.style.display = "block";
+                document.getElementById("propSelectedLineId").textContent =
+                    lineaSeleccionada.id;
+                document.getElementById("propSelectedLineStart").textContent =
+                    lineaSeleccionada.startPointId;
+                document.getElementById("propSelectedLineEnd").textContent =
+                    lineaSeleccionada.endPointId;
+                const longitud = GeoFEMGeometry.longitudLinea(
+                    projectState,
+                    lineaSeleccionada
+                );
+                document.getElementById("propSelectedLineLength").textContent =
+                    longitud === null ? "--" : longitud.toFixed(3);
+            } else if(polilineaSeleccionada){
+                detallePolilinea.style.display = "block";
+                document.getElementById("propSelectedPolylineId").textContent =
+                    polilineaSeleccionada.id;
+                document.getElementById("propSelectedPolylineVertices").textContent =
+                    polilineaSeleccionada.pointIds.length;
+                const longitud = GeoFEMGeometry.longitudPolilinea(
+                    projectState,
+                    polilineaSeleccionada
+                );
+                document.getElementById("propSelectedPolylineLength").textContent =
+                    longitud === null ? "--" : longitud.toFixed(3);
+                document.getElementById("propSelectedPolylineSequence").textContent =
+                    polilineaSeleccionada.pointIds.join(" → ");
+            } else if(regionSeleccionada){
+                detalleRegion.style.display = "block";
+                document.getElementById("propSelectedRegionId").textContent =
+                    regionSeleccionada.id;
+                document.getElementById("propSelectedRegionVertices").textContent =
+                    regionSeleccionada.pointIds.length;
+                const area = GeoFEMRegions.areaRegion(projectState, regionSeleccionada);
+                const perimetro = GeoFEMRegions.perimetroRegion(projectState, regionSeleccionada);
+                document.getElementById("propSelectedRegionArea").textContent =
+                    area === null ? "--" : area.toFixed(3);
+                document.getElementById("propSelectedRegionPerimeter").textContent =
+                    perimetro === null ? "--" : perimetro.toFixed(3);
+                const orientacion = GeoFEMRegions.orientacionRegion(
+                    projectState,
+                    regionSeleccionada
+                );
+                document.getElementById("propSelectedRegionOrientation").textContent =
+                    orientacion === "antihorario"
+                        ? "Antihorario (CCW)"
+                        : (orientacion === "horario" ? "Horario (CW)" : "--");
+                document.getElementById("propSelectedRegionSequence").textContent =
+                    `${regionSeleccionada.pointIds.join(" → ")} → ${regionSeleccionada.pointIds[0]}`;
+            } else {
+                vacioSeleccion.style.display = "block";
+            }
+
+        }
+
+        function actualizarEstadoVacioCad(){
+
+            const resumen = GeoFEMState.resumenProjectState(projectState);
+            const sinGeometria =
+                resumen.geometry.points === 0 &&
+                resumen.geometry.lines === 0 &&
+                resumen.geometry.polylines === 0 &&
+                resumen.geometry.regions === 0;
+
+            document.getElementById("cadEmptyState").style.display =
+                sinGeometria ? "block" : "none";
+            document.getElementById("cadEmptyStateSubtitle").style.display =
+                sinGeometria ? "block" : "none";
+
+        }
+
+        function renderizarViewportCad(){
+
+            GeoFEMViewport.renderGrid(
+                document.getElementById("gridLayer"),
+                projectState.viewport
+            );
+
+            // Las regiones se dibujan debajo del resto de entidades CAD.
+            // Su relleno es visual; la fuente de verdad siguen siendo pointIds.
+            GeoFEMRegions.renderRegions(
+                document.getElementById("regionLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            // La geometría se vuelve a dibujar desde projectState después de
+            // cada zoom o pan. Así los objetos conservan coordenadas reales
+            // y solo cambia su representación en pantalla.
+            GeoFEMGeometry.renderGeometry(
+                document.getElementById("geometryLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            GeoFEMRegions.renderOverlay(
+                document.getElementById("regionSelectionLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            GeoFEMGeometry.renderSelection(
+                document.getElementById("selectionLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            GeoFEMSnap.renderIndicator(
+                document.getElementById("snapLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            GeoFEMViewport.renderReferenceAxes(
+                document.getElementById("coordinateReferenceLayer"),
+                projectState.viewport
+            );
+
+            actualizarPanelDesdeProjectState();
+            actualizarHerramientasCadUi();
+
+        }
+
+        function renderizarProjectState(){
+
+            // Geometría y selección se renderizan desde projectState dentro de
+            // renderizarViewportCad(). Las demás capas todavía no contienen
+            // entidades reales en este paso.
+            limpiarCapaSvg("meshLayer");
+            limpiarCapaSvg("boundaryLayer");
+            limpiarCapaSvg("resultLayer");
+
+            actualizarEstadoVacioCad();
+            renderizarViewportCad();
+
+            console.log(
+                "[GeoFEM] projectState renderizado:",
+                GeoFEMState.resumenProjectState(projectState)
+            );
+
+        }
+
+        function actualizarLecturaCursor(puntoModelo = null){
+
+            const x = document.getElementById("txt-cursor-x");
+            const y = document.getElementById("txt-cursor-y");
+
+            if(!puntoModelo){
+                x.textContent = "--";
+                y.textContent = "--";
+                return;
+            }
+
+            x.textContent = puntoModelo.x.toFixed(2);
+            y.textContent = puntoModelo.y.toFixed(2);
+
+        }
+
+        function actualizarConfiguracionSnapDesdePanel(){
+            if(!projectState?.viewport?.snap){
+                return;
+            }
+
+            const tolerancia = Number(
+                document.getElementById("snapTolerancePx").value
+            );
+
+            projectState.viewport.snap.enabled =
+                document.getElementById("snapEnabled").checked;
+            projectState.viewport.snap.points =
+                document.getElementById("snapPoints").checked;
+            projectState.viewport.snap.grid =
+                document.getElementById("snapGrid").checked;
+            projectState.viewport.snap.tolerancePx =
+                Math.min(Math.max(Number.isFinite(tolerancia) ? tolerancia : 12, 2), 40);
+
+            GeoFEMSnap.limpiarCandidato(projectState);
+            renderizarViewportCad();
+        }
+
+        function alternarSnapCad(){
+            if(!projectState?.viewport?.snap){
+                return;
+            }
+
+            projectState.viewport.snap.enabled =
+                projectState.viewport.snap.enabled === false;
+            GeoFEMSnap.limpiarCandidato(projectState);
+            renderizarViewportCad();
+        }
+
+        function nombreHerramientaCad(herramienta){
+            if(herramienta === "point") return "Crear Punto";
+            if(herramienta === "line") return "Crear Línea";
+            if(herramienta === "polyline") return "Crear Polilínea";
+            if(herramienta === "region") return "Crear Región";
+            if(herramienta === "region-insert") return "Insertar vértice en región";
+            if(herramienta === "region-remove") return "Quitar vértice de región";
+            return "Seleccionar";
+        }
+
+        function htmlPanelGeometria(){
+            return `
+                <button
+                    class="tool-btn"
+                    data-cad-tool="select"
+                    onclick="activarHerramientaCad('select')"
+                >
+                    ↖ Seleccionar
+                </button>
+
+                <button
+                    class="tool-btn"
+                    data-cad-tool="point"
+                    onclick="activarHerramientaCad('point')"
+                >
+                    • Crear Punto
+                </button>
+
+                <button class="tool-btn" disabled title="Se integrará en un paso posterior">
+                    📁 Importar DXF · próximamente
+                </button>
+
+                <button class="tool-btn" disabled title="Se construirá después de validar puntos y líneas">
+                    ✏ Dibujar Estrato · próximamente
+                </button>
+
+                <button
+                    class="tool-btn"
+                    data-cad-tool="line"
+                    onclick="activarHerramientaCad('line')"
+                    title="Haz clic en un punto inicial y luego en un punto final"
+                >
+                    ╱ Crear Línea
+                </button>
+
+                <button
+                    class="tool-btn"
+                    data-cad-tool="polyline"
+                    onclick="activarHerramientaCad('polyline')"
+                    title="Selecciona puntos consecutivos y pulsa Enter para finalizar"
+                >
+                    ⌁ Crear Polilínea
+                </button>
+
+                <button
+                    class="tool-btn"
+                    data-cad-tool="region"
+                    onclick="activarHerramientaCad('region')"
+                    title="Selecciona al menos tres puntos y vuelve al primero para cerrar"
+                >
+                    ◇ Crear Región
+                </button>
+
+                <button
+                    id="btnEliminarSeleccionado"
+                    class="tool-btn danger-tool"
+                    onclick="eliminarEntidadSeleccionadaCad()"
+                    disabled
+                    title="Selecciona un punto, línea, polilínea o región para eliminarlo"
+                >
+                    🗑 Eliminar seleccionado
+                </button>
+            `;
+        }
+
+        function actualizarHerramientasCadUi(){
+            const herramienta = projectState?.ui?.activeTool || "select";
+            const svg = document.getElementById("cadSvg");
+
+            document.querySelectorAll("[data-cad-tool]").forEach((boton) => {
+                boton.classList.toggle(
+                    "active-tool",
+                    boton.dataset.cadTool === herramienta
+                );
+            });
+
+            svg.classList.toggle(
+                "tool-point",
+                projectState?.ui?.activeModule === "geometria" &&
+                herramienta === "point"
+            );
+            svg.classList.toggle(
+                "tool-line",
+                projectState?.ui?.activeModule === "geometria" &&
+                herramienta === "line"
+            );
+            svg.classList.toggle(
+                "tool-polyline",
+                projectState?.ui?.activeModule === "geometria" &&
+                herramienta === "polyline"
+            );
+            svg.classList.toggle(
+                "tool-region",
+                projectState?.ui?.activeModule === "geometria" &&
+                herramienta === "region"
+            );
+            svg.classList.toggle(
+                "tool-select",
+                projectState?.ui?.activeModule !== "geometria" ||
+                herramienta === "select"
+            );
+
+            const botonEliminar =
+                document.getElementById("btnEliminarSeleccionado");
+            if(botonEliminar){
+                botonEliminar.disabled =
+                    !GeoFEMGeometry.seleccionActual(projectState);
+            }
+        }
+
+        function activarHerramientaCad(herramienta){
+            if(!projectState?.ui){
+                return;
+            }
+
+            if(![
+                "select",
+                "point",
+                "line",
+                "polyline",
+                "region",
+                "region-insert",
+                "region-remove"
+            ].includes(herramienta)){
+                return;
+            }
+
+            if(herramienta !== "line"){
+                projectState.ui.lineDraftStartPointId = null;
+            }
+
+            if(herramienta !== "polyline"){
+                GeoFEMGeometry.cancelarBorradorPolilinea(projectState);
+            }
+
+            if(herramienta !== "region"){
+                GeoFEMRegions.cancelarBorradorRegion(projectState);
+            }
+
+            if(!["region-insert", "region-remove"].includes(herramienta)){
+                GeoFEMRegions.cancelarEdicionRegion(projectState);
+            }
+
+            projectState.ui.activeTool = herramienta;
+            GeoFEMSnap.limpiarCandidato(projectState);
+            actualizarHerramientasCadUi();
+            actualizarPanelDesdeProjectState();
+        }
+
+        function actualizarPuntoSeleccionadoDesdePanel(){
+            const punto = GeoFEMGeometry.puntoSeleccionado(projectState);
+            if(!punto){
+                alert("Selecciona primero un punto para editarlo.");
+                return;
+            }
+
+            const inputX = document.getElementById("inputSelectedPointX");
+            const inputY = document.getElementById("inputSelectedPointY");
+
+            if(inputX.value.trim() === "" || inputY.value.trim() === ""){
+                alert("X e Y son obligatorios para editar el punto.");
+                return;
+            }
+
+            const x = Number(inputX.value);
+            const y = Number(inputY.value);
+
+            if(!Number.isFinite(x) || !Number.isFinite(y)){
+                alert("X e Y deben ser valores numéricos válidos.");
+                return;
+            }
+
+            const resultado = GeoFEMGeometry.actualizarPunto(
+                projectState,
+                punto.id,
+                {x, y}
+            );
+
+            if(!resultado.ok){
+                if(resultado.reason === "self_intersection"){
+                    alert(
+                        `No se puede mover ${punto.id}: la edición haría que ` +
+                        `${resultado.regionId || "una región"} se cruce consigo misma.`
+                    );
+                } else if(resultado.reason === "zero_area"){
+                    alert(
+                        `No se puede mover ${punto.id}: la edición dejaría ` +
+                        `${resultado.regionId || "una región"} con área cero.`
+                    );
+                } else if(resultado.reason === "duplicate_position"){
+                    alert(
+                        `No se puede mover ${punto.id}: coincidiría exactamente con ` +
+                        `otro vértice de ${resultado.regionId || "una región"}.`
+                    );
+                } else {
+                    alert("No fue posible actualizar el punto seleccionado.");
+                }
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Punto actualizado:", resultado.punto);
+        }
+
+        function eliminarPuntoSeleccionadoCad(){
+            const punto = GeoFEMGeometry.puntoSeleccionado(projectState);
+            if(!punto){
+                return;
+            }
+
+            const confirmar = window.confirm(
+                `¿Eliminar ${punto.id} (${punto.x.toFixed(3)}, ${punto.y.toFixed(3)}) m? ` +
+                "Esta acción todavía no puede deshacerse."
+            );
+
+            if(!confirmar){
+                return;
+            }
+
+            const resultado =
+                GeoFEMGeometry.eliminarPuntoSeleccionado(projectState);
+
+            if(!resultado.ok && resultado.reason === "referenced"){
+                const nombres = resultado.referencias
+                    .map((referencia) => referencia.id)
+                    .join(", ");
+                alert(
+                    `No se puede eliminar ${punto.id} porque está referenciado por ` +
+                    `${resultado.referencias.length} entidad(es): ${nombres}. ` +
+                    "Primero elimina o modifica esas entidades."
+                );
+                return;
+            }
+
+            if(!resultado.ok){
+                alert("No fue posible eliminar el punto seleccionado.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Punto eliminado:", resultado.punto);
+        }
+
+        function eliminarLineaSeleccionadaCad(){
+            const linea = GeoFEMGeometry.lineaSeleccionada(projectState);
+            if(!linea){
+                return;
+            }
+
+            const longitud = GeoFEMGeometry.longitudLinea(projectState, linea);
+            const confirmar = window.confirm(
+                `¿Eliminar ${linea.id} (${linea.startPointId} → ${linea.endPointId})` +
+                `${longitud === null ? "" : ` · ${longitud.toFixed(3)} m`}? ` +
+                "Los puntos extremos se conservarán."
+            );
+
+            if(!confirmar){
+                return;
+            }
+
+            const resultado =
+                GeoFEMGeometry.eliminarLineaSeleccionada(projectState);
+
+            if(!resultado.ok){
+                alert("No fue posible eliminar la línea seleccionada.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Línea eliminada:", resultado.linea);
+        }
+
+        function eliminarPolilineaSeleccionadaCad(){
+            const polilinea = GeoFEMGeometry.polilineaSeleccionada(projectState);
+            if(!polilinea){
+                return;
+            }
+
+            const longitud = GeoFEMGeometry.longitudPolilinea(projectState, polilinea);
+            const confirmar = window.confirm(
+                `¿Eliminar ${polilinea.id} (${polilinea.pointIds.join(" → ")})` +
+                `${longitud === null ? "" : ` · ${longitud.toFixed(3)} m`}? ` +
+                "Los puntos que forman sus vértices se conservarán."
+            );
+
+            if(!confirmar){
+                return;
+            }
+
+            const resultado =
+                GeoFEMGeometry.eliminarPolilineaSeleccionada(projectState);
+
+            if(!resultado.ok){
+                alert("No fue posible eliminar la polilínea seleccionada.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Polilínea eliminada:", resultado.polilinea);
+        }
+
+        function eliminarRegionSeleccionadaCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region){
+                return;
+            }
+
+            const area = GeoFEMRegions.areaRegion(projectState, region);
+            const perimetro = GeoFEMRegions.perimetroRegion(projectState, region);
+            const confirmar = window.confirm(
+                `¿Eliminar ${region.id} (${region.pointIds.join(" → ")} → ${region.pointIds[0]})` +
+                `${area === null ? "" : ` · área ${area.toFixed(3)} m²`}` +
+                `${perimetro === null ? "" : ` · perímetro ${perimetro.toFixed(3)} m`}? ` +
+                "Los puntos del contorno se conservarán."
+            );
+
+            if(!confirmar){
+                return;
+            }
+
+            const resultado = GeoFEMRegions.eliminarRegionSeleccionada(projectState);
+            if(!resultado.ok){
+                alert("No fue posible eliminar la región seleccionada.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Región eliminada:", resultado.region);
+        }
+
+        function iniciarInsercionVerticeRegionCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region){
+                alert("Selecciona primero una región.");
+                return;
+            }
+
+            GeoFEMRegions.iniciarEdicionRegion(projectState, region.id);
+            activarHerramientaCad("region-insert");
+            document.getElementById("txt-status").textContent =
+                `Edición ${region.id}: haz clic cerca del borde donde quieras insertar el nuevo vértice.`;
+            renderizarViewportCad();
+        }
+
+        function iniciarQuitarVerticeRegionCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region){
+                alert("Selecciona primero una región.");
+                return;
+            }
+
+            if(region.pointIds.length <= 3){
+                alert(
+                    `${region.id} ya tiene el mínimo de 3 vértices. ` +
+                    "No es posible quitar otro vértice del contorno."
+                );
+                return;
+            }
+
+            GeoFEMRegions.iniciarEdicionRegion(projectState, region.id);
+            activarHerramientaCad("region-remove");
+            document.getElementById("txt-status").textContent =
+                `Edición ${region.id}: haz clic sobre el vértice que quieras quitar del contorno.`;
+            renderizarViewportCad();
+        }
+
+        function invertirRegionSeleccionadaCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region) return;
+
+            const antes = GeoFEMRegions.orientacionRegion(projectState, region);
+            const resultado = GeoFEMRegions.invertirRegion(projectState, region.id);
+            if(!resultado.ok){
+                alert("No fue posible invertir el sentido de la región.");
+                return;
+            }
+
+            renderizarProjectState();
+            const despues = GeoFEMRegions.orientacionRegion(projectState, resultado.region);
+            console.log(
+                `[GeoFEM] ${region.id}: orientación ${antes} → ${despues}`
+            );
+        }
+
+        function eliminarEntidadSeleccionadaCad(){
+            if(GeoFEMGeometry.puntoSeleccionado(projectState)){
+                eliminarPuntoSeleccionadoCad();
+                return;
+            }
+
+            if(GeoFEMGeometry.lineaSeleccionada(projectState)){
+                eliminarLineaSeleccionadaCad();
+                return;
+            }
+
+            if(GeoFEMGeometry.polilineaSeleccionada(projectState)){
+                eliminarPolilineaSeleccionadaCad();
+                return;
+            }
+
+            if(GeoFEMRegions.regionSeleccionada(projectState)){
+                eliminarRegionSeleccionadaCad();
+            }
+        }
+
+        function cancelarBorradorLinea(){
+            if(projectState?.ui){
+                projectState.ui.lineDraftStartPointId = null;
+            }
+        }
+
+        function cancelarBorradorPolilinea(){
+            GeoFEMGeometry.cancelarBorradorPolilinea(projectState);
+        }
+
+        function finalizarBorradorPolilineaCad(){
+            const resultado = GeoFEMGeometry.finalizarBorradorPolilinea(projectState);
+
+            if(!resultado.ok){
+                if(resultado.reason === "insufficient_vertices"){
+                    alert("La polilínea necesita al menos dos vértices antes de finalizar.");
+                } else if(resultado.reason === "duplicate"){
+                    alert("Ya existe una polilínea con la misma secuencia de vértices.");
+                } else {
+                    alert("No fue posible crear la polilínea.");
+                }
+                return false;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Polilínea creada:", resultado.polilinea);
+            return true;
+        }
+
+        function cancelarBorradorRegion(){
+            GeoFEMRegions.cancelarBorradorRegion(projectState);
+        }
+
+        function finalizarBorradorRegionCad(){
+            const resultado = GeoFEMRegions.finalizarBorradorRegion(projectState);
+
+            if(!resultado.ok){
+                if(resultado.reason === "insufficient_vertices"){
+                    alert("La región necesita al menos tres vértices para cerrarse.");
+                } else if(resultado.reason === "self_intersection"){
+                    alert("La región se cruza consigo misma. Reordena los vértices para formar un contorno simple.");
+                } else if(resultado.reason === "zero_area"){
+                    alert("La región no puede tener área cero. Los vértices no deben ser colineales.");
+                } else if(resultado.reason === "duplicate"){
+                    alert("Ya existe una región con el mismo contorno.");
+                } else {
+                    alert("No fue posible crear la región.");
+                }
+                return false;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Región creada:", resultado.region);
+            return true;
+        }
+
+        function configurarInteraccionViewportCad(){
+
+            const svg = document.getElementById("cadSvg");
+            const estadoPan = {
+                activo: false,
+                pointerId: null,
+                ultimoSvg: null,
+            };
+
+            function actualizarCursorDesdeEvento(evento){
+                const herramienta = projectState?.ui?.activeTool || "select";
+                const usarSnap =
+                    projectState?.ui?.activeModule === "geometria" &&
+                    ["point", "line", "polyline", "region", "region-remove"].includes(herramienta);
+
+                if(!usarSnap){
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    const conversion = GeoFEMViewport.eventToModel(
+                        svg,
+                        evento,
+                        projectState.viewport
+                    );
+                    actualizarLecturaCursor(conversion.model);
+                    return {
+                        raw: conversion,
+                        candidate: null,
+                        model: conversion.model,
+                        svg: conversion.svg,
+                    };
+                }
+
+                const snapResult = GeoFEMSnap.resolverEvento(
+                    svg,
+                    evento,
+                    projectState,
+                    projectState.viewport,
+                    {
+                        allowPoint: true,
+                        // Línea, polilínea y región necesitan IDs de puntos existentes.
+                        // El grid se usa para crear puntos libres con precisión.
+                        allowGrid: herramienta === "point",
+                    }
+                );
+
+                GeoFEMSnap.establecerCandidato(
+                    projectState,
+                    snapResult.candidate
+                );
+                actualizarLecturaCursor(snapResult.model);
+                return snapResult;
+            }
+
+            svg.addEventListener("wheel", (evento) => {
+                evento.preventDefault();
+
+                const anclaSvg = GeoFEMViewport.clientToSvg(
+                    svg,
+                    evento.clientX,
+                    evento.clientY
+                );
+                const factor = evento.deltaY < 0 ? 1.15 : (1 / 1.15);
+
+                GeoFEMViewport.zoomByFactorAtSvgPoint(
+                    projectState.viewport,
+                    factor,
+                    anclaSvg
+                );
+
+                actualizarCursorDesdeEvento(evento);
+                renderizarViewportCad();
+            }, {passive:false});
+
+            svg.addEventListener("pointerdown", (evento) => {
+                const botonCentral = evento.button === 1;
+                const shiftIzquierdo = evento.button === 0 && evento.shiftKey;
+
+                // El pan tiene prioridad sobre cualquier herramienta CAD.
+                if(botonCentral || shiftIzquierdo){
+                    evento.preventDefault();
+                    estadoPan.activo = true;
+                    estadoPan.pointerId = evento.pointerId;
+                    estadoPan.ultimoSvg = GeoFEMViewport.clientToSvg(
+                        svg,
+                        evento.clientX,
+                        evento.clientY
+                    );
+
+                    svg.setPointerCapture(evento.pointerId);
+                    svg.classList.add("is-panning");
+                    return;
+                }
+
+                if(evento.button !== 0){
+                    return;
+                }
+
+                // Fuera del módulo Geometría no permitimos crear/seleccionar
+                // entidades CAD en este paso.
+                if(projectState?.ui?.activeModule !== "geometria"){
+                    return;
+                }
+
+                const conversion = actualizarCursorDesdeEvento(evento);
+                const herramienta = projectState.ui.activeTool || "select";
+
+                if(herramienta === "point"){
+                    evento.preventDefault();
+
+                    if(conversion.candidate?.type === "point"){
+                        GeoFEMGeometry.seleccionarPunto(
+                            projectState,
+                            conversion.candidate.pointId
+                        );
+                        renderizarViewportCad();
+                        document.getElementById("txt-status").textContent =
+                            `Snap: ${conversion.candidate.pointId} ya existe; se seleccionó el punto existente.`;
+                        return;
+                    }
+
+                    const punto = GeoFEMGeometry.crearPunto(
+                        projectState,
+                        conversion.model
+                    );
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    renderizarProjectState();
+                    actualizarLecturaCursor(conversion.model);
+                    console.log("[GeoFEM] Punto creado:", punto);
+                    return;
+                }
+
+                if(herramienta === "line"){
+                    evento.preventDefault();
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
+
+                    if(!puntoObjetivoId){
+                        return;
+                    }
+
+                    const inicioId = projectState.ui.lineDraftStartPointId;
+                    if(!inicioId){
+                        projectState.ui.lineDraftStartPointId = puntoObjetivoId;
+                        GeoFEMGeometry.seleccionarPunto(projectState, puntoObjetivoId);
+                        renderizarViewportCad();
+                        console.log(`[GeoFEM] Línea: punto inicial ${puntoObjetivoId}`);
+                        return;
+                    }
+
+                    const resultado = GeoFEMGeometry.crearLinea(
+                        projectState,
+                        inicioId,
+                        puntoObjetivoId
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "same_point"){
+                            alert("El punto inicial y el punto final deben ser diferentes.");
+                        } else if(resultado.reason === "duplicate"){
+                            alert("Ya existe una línea entre esos dos puntos.");
+                        } else {
+                            alert("No fue posible crear la línea.");
+                        }
+                        return;
+                    }
+
+                    projectState.ui.lineDraftStartPointId = null;
+                    renderizarProjectState();
+                    console.log("[GeoFEM] Línea creada:", resultado.linea);
+                    return;
+                }
+
+                if(herramienta === "polyline"){
+                    evento.preventDefault();
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
+
+                    if(!puntoObjetivoId){
+                        return;
+                    }
+
+                    const resultado = GeoFEMGeometry.agregarVerticeBorradorPolilinea(
+                        projectState,
+                        puntoObjetivoId
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "same_consecutive_point"){
+                            alert("Selecciona un punto diferente para el siguiente vértice.");
+                        } else if(resultado.reason === "duplicate_vertex"){
+                            alert("Ese punto ya forma parte del borrador de la polilínea.");
+                        }
+                        return;
+                    }
+
+                    GeoFEMGeometry.limpiarSeleccion(projectState);
+                    renderizarViewportCad();
+                    console.log(
+                        "[GeoFEM] Polilínea · vértices del borrador:",
+                        resultado.pointIds
+                    );
+                    return;
+                }
+
+                if(herramienta === "region"){
+                    evento.preventDefault();
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
+
+                    if(!puntoObjetivoId){
+                        return;
+                    }
+
+                    const resultado = GeoFEMRegions.agregarVerticeBorradorRegion(
+                        projectState,
+                        puntoObjetivoId
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "same_consecutive_point"){
+                            alert("Selecciona un punto diferente para el siguiente vértice.");
+                        } else if(resultado.reason === "insufficient_to_close"){
+                            alert("Necesitas al menos tres vértices distintos antes de cerrar la región.");
+                        } else if(resultado.reason === "duplicate_vertex"){
+                            alert("Ese punto ya forma parte del borrador. Para cerrar, vuelve únicamente al primer vértice.");
+                        }
+                        return;
+                    }
+
+                    if(resultado.closeRequested){
+                        finalizarBorradorRegionCad();
+                        return;
+                    }
+
+                    GeoFEMGeometry.limpiarSeleccion(projectState);
+                    renderizarViewportCad();
+                    console.log(
+                        "[GeoFEM] Región · vértices del borrador:",
+                        resultado.pointIds
+                    );
+                    return;
+                }
+
+                if(herramienta === "region-insert"){
+                    evento.preventDefault();
+                    const region = GeoFEMRegions.regionObjetivoEdicion(projectState);
+                    if(!region){
+                        activarHerramientaCad("select");
+                        renderizarViewportCad();
+                        return;
+                    }
+
+                    const tolerancia = Math.max(
+                        14,
+                        Number(projectState?.viewport?.snap?.tolerancePx) || 12
+                    );
+                    const resultado = GeoFEMRegions.insertarVerticeEnBorde(
+                        projectState,
+                        region.id,
+                        projectState.viewport,
+                        conversion.svg,
+                        tolerancia
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "edge_not_found"){
+                            document.getElementById("txt-status").textContent =
+                                `Edición ${region.id}: haz clic más cerca de uno de sus bordes.`;
+                        } else if(resultado.reason === "near_endpoint"){
+                            alert(
+                                "El clic está demasiado cerca de un vértice existente. " +
+                                "Selecciona una zona intermedia del borde."
+                            );
+                        } else {
+                            alert("No fue posible insertar el vértice en la región.");
+                        }
+                        return;
+                    }
+
+                    projectState.ui.activeTool = "select";
+                    GeoFEMRegions.cancelarEdicionRegion(projectState);
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    renderizarProjectState();
+                    console.log(
+                        `[GeoFEM] ${region.id}: vértice ${resultado.punto.id} insertado`,
+                        resultado
+                    );
+                    return;
+                }
+
+                if(herramienta === "region-remove"){
+                    evento.preventDefault();
+                    const region = GeoFEMRegions.regionObjetivoEdicion(projectState);
+                    if(!region){
+                        activarHerramientaCad("select");
+                        renderizarViewportCad();
+                        return;
+                    }
+
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
+
+                    if(!puntoObjetivoId){
+                        document.getElementById("txt-status").textContent =
+                            `Edición ${region.id}: selecciona uno de sus vértices.`;
+                        return;
+                    }
+
+                    const resultado = GeoFEMRegions.quitarVerticeRegion(
+                        projectState,
+                        region.id,
+                        puntoObjetivoId
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "point_not_in_region"){
+                            alert(`${puntoObjetivoId} no pertenece al contorno de ${region.id}.`);
+                        } else if(resultado.reason === "minimum_vertices"){
+                            alert("Una región cerrada debe conservar al menos 3 vértices.");
+                        } else if(resultado.reason === "self_intersection"){
+                            alert("Quitar ese vértice produciría una autointersección.");
+                        } else if(resultado.reason === "zero_area"){
+                            alert("Quitar ese vértice dejaría la región con área cero.");
+                        } else {
+                            alert("No fue posible quitar el vértice del contorno.");
+                        }
+                        return;
+                    }
+
+                    projectState.ui.activeTool = "select";
+                    GeoFEMRegions.cancelarEdicionRegion(projectState);
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    renderizarProjectState();
+                    console.log(
+                        `[GeoFEM] ${region.id}: ${puntoObjetivoId} retirado del contorno; el punto se conserva.`
+                    );
+                    return;
+                }
+
+                if(herramienta === "select"){
+                    const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+
+                    if(entidad?.type === "point"){
+                        GeoFEMGeometry.seleccionarPunto(projectState, entidad.id);
+                    } else if(entidad?.type === "line"){
+                        GeoFEMGeometry.seleccionarLinea(projectState, entidad.id);
+                    } else if(entidad?.type === "polyline"){
+                        GeoFEMGeometry.seleccionarPolilinea(projectState, entidad.id);
+                    } else if(entidad?.type === "region"){
+                        GeoFEMRegions.seleccionarRegion(projectState, entidad.id);
+                    } else {
+                        GeoFEMGeometry.limpiarSeleccion(projectState);
+                    }
+
+                    renderizarViewportCad();
+                }
+            });
+
+            svg.addEventListener("pointermove", (evento) => {
+                if(estadoPan.activo && evento.pointerId === estadoPan.pointerId){
+                    const actualSvg = GeoFEMViewport.clientToSvg(
+                        svg,
+                        evento.clientX,
+                        evento.clientY
+                    );
+
+                    GeoFEMViewport.panBySvgDelta(
+                        projectState.viewport,
+                        actualSvg.x - estadoPan.ultimoSvg.x,
+                        actualSvg.y - estadoPan.ultimoSvg.y
+                    );
+
+                    estadoPan.ultimoSvg = actualSvg;
+                    renderizarViewportCad();
+                }
+
+                const conversion = actualizarCursorDesdeEvento(evento);
+                const herramienta = projectState?.ui?.activeTool || "select";
+                let requiereRender =
+                    projectState?.ui?.activeModule === "geometria" &&
+                    [
+                        "point",
+                        "line",
+                        "polyline",
+                        "region",
+                        "region-insert",
+                        "region-remove"
+                    ].includes(herramienta);
+
+                if(
+                    projectState?.ui?.activeModule === "geometria" &&
+                    herramienta === "polyline" &&
+                    Array.isArray(projectState.ui.polylineDraftPointIds) &&
+                    projectState.ui.polylineDraftPointIds.length > 0
+                ){
+                    GeoFEMGeometry.actualizarCursorBorradorPolilinea(
+                        projectState,
+                        conversion.model
+                    );
+                    requiereRender = true;
+                }
+
+                if(
+                    projectState?.ui?.activeModule === "geometria" &&
+                    herramienta === "region" &&
+                    Array.isArray(projectState.ui.regionDraftPointIds) &&
+                    projectState.ui.regionDraftPointIds.length > 0
+                ){
+                    GeoFEMRegions.actualizarCursorBorradorRegion(
+                        projectState,
+                        conversion.model
+                    );
+                    requiereRender = true;
+                }
+
+                if(requiereRender){
+                    renderizarViewportCad();
+                }
+            });
+
+            function finalizarPan(evento){
+                if(!estadoPan.activo){
+                    return;
+                }
+
+                if(
+                    evento &&
+                    estadoPan.pointerId !== null &&
+                    svg.hasPointerCapture(estadoPan.pointerId)
+                ){
+                    svg.releasePointerCapture(estadoPan.pointerId);
+                }
+
+                estadoPan.activo = false;
+                estadoPan.pointerId = null;
+                estadoPan.ultimoSvg = null;
+                svg.classList.remove("is-panning");
+            }
+
+            svg.addEventListener("pointerup", finalizarPan);
+            svg.addEventListener("pointercancel", finalizarPan);
+
+            svg.addEventListener("pointerleave", () => {
+                if(!estadoPan.activo){
+                    actualizarLecturaCursor(null);
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    GeoFEMGeometry.actualizarCursorBorradorPolilinea(
+                        projectState,
+                        null
+                    );
+                    GeoFEMRegions.actualizarCursorBorradorRegion(
+                        projectState,
+                        null
+                    );
+                    renderizarViewportCad();
+                }
+            });
+
+            document.addEventListener("keydown", (evento) => {
+                const etiqueta = document.activeElement?.tagName?.toLowerCase();
+                const editandoCampo =
+                    etiqueta === "input" ||
+                    etiqueta === "textarea" ||
+                    document.activeElement?.isContentEditable;
+
+                if(editandoCampo){
+                    return;
+                }
+
+                if(evento.key === "F3"){
+                    evento.preventDefault();
+                    alternarSnapCad();
+                    return;
+                }
+
+                if(evento.key === "Escape"){
+                    cancelarBorradorLinea();
+                    cancelarBorradorPolilinea();
+                    cancelarBorradorRegion();
+                    GeoFEMRegions.cancelarEdicionRegion(projectState);
+                    if(projectState?.ui){
+                        projectState.ui.activeTool = "select";
+                    }
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    GeoFEMGeometry.limpiarSeleccion(projectState);
+                    renderizarViewportCad();
+                    return;
+                }
+
+                if(evento.key === "Enter"){
+                    if(
+                        projectState?.ui?.activeModule === "geometria" &&
+                        projectState?.ui?.activeTool === "polyline" &&
+                        Array.isArray(projectState.ui.polylineDraftPointIds) &&
+                        projectState.ui.polylineDraftPointIds.length > 0
+                    ){
+                        evento.preventDefault();
+                        finalizarBorradorPolilineaCad();
+                        return;
+                    }
+
+                    if(
+                        projectState?.ui?.activeModule === "geometria" &&
+                        projectState?.ui?.activeTool === "region" &&
+                        Array.isArray(projectState.ui.regionDraftPointIds) &&
+                        projectState.ui.regionDraftPointIds.length > 0
+                    ){
+                        evento.preventDefault();
+                        finalizarBorradorRegionCad();
+                    }
+                    return;
+                }
+
+                if(evento.key === "Delete"){
+                    if(GeoFEMGeometry.seleccionActual(projectState)){
+                        evento.preventDefault();
+                        eliminarEntidadSeleccionadaCad();
+                    }
+                }
+            });
+
+            // Prueba numérica de ida y vuelta. Si las transformaciones son
+            // correctas, recuperar (10,5) debe producir prácticamente (10,5).
+            const prueba = GeoFEMViewport.roundTripError(
+                {x: 10, y: 5},
+                projectState.viewport
+            );
+
+            console.log("[GeoFEM] Prueba coordenadas modelo ↔ SVG:", prueba);
+
+        }
+
+        function restablecerVistaCad(){
+            GeoFEMViewport.resetView(projectState.viewport);
+            GeoFEMSnap.limpiarCandidato(projectState);
+            renderizarViewportCad();
+            actualizarLecturaCursor(null);
+        }
+
+        configurarInteraccionViewportCad();
+
         function activarProyecto(proyecto){
 
             proyectoActivo = {...proyecto};
 
+            // Creamos un estado NUEVO para el proyecto seleccionado.
+            // Evitamos que geometría/materiales de un proyecto puedan mezclarse
+            // accidentalmente con otro.
+            projectState = GeoFEMState.crearProjectState(proyectoActivo);
+
             document.getElementById("workspaceProjectName").textContent =
-                proyectoActivo.nombre;
+                projectState.project.nombre;
 
             document.getElementById("txt-status").textContent =
-                `Proyecto #${proyectoActivo.id} · ${proyectoActivo.codigo}`;
+                `Proyecto #${projectState.project.id} · ${projectState.project.codigo}`;
+
+            renderizarProjectState();
+            actualizarHerramientasCadUi();
 
             console.log("[GeoFEM] Proyecto activo:", proyectoActivo);
+            console.log("[GeoFEM] Estado central:", projectState);
 
         }
 
@@ -1795,6 +3799,18 @@
         }
 
         function volverAlDashboard(){
+
+            if(projectState?.dirty){
+                const salir = window.confirm(
+                    "La geometría CAD creada en este paso todavía vive solo en memoria " +
+                    "y aún no se guarda en MySQL. Si vuelves al Dashboard, perderás " +
+                    "los puntos locales de esta sesión. ¿Deseas continuar?"
+                );
+
+                if(!salir){
+                    return;
+                }
+            }
 
             mostrarPantalla("dashboard");
             cargarProyectosDashboard();
@@ -1899,6 +3915,16 @@
 
 function cambiarModulo(modulo, boton){
 
+    if(projectState && projectState.ui){
+        projectState.ui.activeModule = modulo;
+
+        if(modulo !== "geometria"){
+            projectState.ui.activeTool = "select";
+            projectState.ui.lineDraftStartPointId = null;
+            GeoFEMGeometry.cancelarBorradorPolilinea(projectState);
+        }
+    }
+
     document
     .querySelectorAll(
         ".workspace-menu button"
@@ -1930,25 +3956,8 @@ function cambiarModulo(modulo, boton){
         titulo.innerText =
             "Geometría";
 
-        panel.innerHTML=`
-
-            <button class="tool-btn">
-                📁 Importar DXF
-            </button>
-
-            <button class="tool-btn">
-                ✏ Dibujar Estrato
-            </button>
-
-            <button class="tool-btn">
-                ✏ Dibujar Línea
-            </button>
-
-            <button class="tool-btn">
-                🧹 Limpiar
-            </button>
-
-        `;
+        panel.innerHTML = htmlPanelGeometria();
+        actualizarHerramientasCadUi();
     }
 
     if(modulo==="malla"){
@@ -2052,6 +4061,9 @@ function cambiarModulo(modulo, boton){
 
         `;
     }
+
+    actualizarHerramientasCadUi();
+    actualizarPanelDesdeProjectState();
 
 }
     </script>
