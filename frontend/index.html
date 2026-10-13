@@ -929,6 +929,60 @@
     line-height:1.45;
 }
 
+.snap-settings{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px solid #e2e8f0;
+}
+
+.snap-settings-title{
+    font-size:12px;
+    font-weight:800;
+    color:#334155;
+    margin-bottom:8px;
+}
+
+.snap-option{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    margin:6px 0;
+    font-size:12px;
+    color:#475569;
+}
+
+.snap-option input[type="checkbox"]{
+    accent-color:#0f766e;
+}
+
+.snap-tolerance-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-top:8px;
+    font-size:12px;
+    color:#475569;
+}
+
+.snap-tolerance-row input{
+    width:72px;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    padding:5px 7px;
+    font-family:Consolas, "Courier New", monospace;
+}
+
+.snap-status-badge{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    background:#ecfeff;
+    color:#0e7490;
+    font-size:11px;
+    font-weight:800;
+}
+
 .point-editor-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -1587,6 +1641,7 @@
                 <g id="overlayLayer">
                     <!-- Ejes X/Y de referencia. No pertenecen a la geometría. -->
                     <g id="coordinateReferenceLayer"></g>
+                    <g id="snapLayer" pointer-events="none"></g>
 
                     <text
                         id="cadEmptyState"
@@ -1860,6 +1915,56 @@
                 <span id="propPanViewport" class="coordinate-value">(0.0, 0.0)</span>
             </p>
 
+            <div class="snap-settings">
+                <div class="snap-settings-title">Precisión CAD · Snap</div>
+
+                <label class="snap-option">
+                    <input
+                        id="snapEnabled"
+                        type="checkbox"
+                        onchange="actualizarConfiguracionSnapDesdePanel()"
+                    />
+                    Activar snap <span style="color:#94a3b8;">(F3)</span>
+                </label>
+
+                <label class="snap-option">
+                    <input
+                        id="snapPoints"
+                        type="checkbox"
+                        onchange="actualizarConfiguracionSnapDesdePanel()"
+                    />
+                    Vértices existentes
+                </label>
+
+                <label class="snap-option">
+                    <input
+                        id="snapGrid"
+                        type="checkbox"
+                        onchange="actualizarConfiguracionSnapDesdePanel()"
+                    />
+                    Grid visible
+                </label>
+
+                <div class="snap-tolerance-row">
+                    <label for="snapTolerancePx">Tolerancia</label>
+                    <div>
+                        <input
+                            id="snapTolerancePx"
+                            type="number"
+                            min="2"
+                            max="40"
+                            step="1"
+                            onchange="actualizarConfiguracionSnapDesdePanel()"
+                        /> px
+                    </div>
+                </div>
+
+                <p style="margin-top:9px;">
+                    Candidato:
+                    <span id="propSnapCandidate" class="snap-status-badge">--</span>
+                </p>
+            </div>
+
             <button
                 class="viewport-reset-btn"
                 type="button"
@@ -1937,6 +2042,13 @@
 
     <div>
 
+        Snap:
+        <span id="txt-snap" class="coordinate-value">--</span>
+
+    </div>
+
+    <div>
+
         Estado:
 
         <span id="txt-status">
@@ -1957,6 +2069,7 @@
     <script src="js/project-state.js"></script>
     <script src="js/viewport.js"></script>
     <script src="js/cad-geometry.js"></script>
+    <script src="js/cad-snap.js"></script>
 
     <script>
 
@@ -2299,6 +2412,21 @@
             document.getElementById("txt-zoom").textContent =
                 zoomPorcentaje;
 
+            const snap = viewport.snap || {};
+            document.getElementById("snapEnabled").checked = snap.enabled !== false;
+            document.getElementById("snapPoints").checked = snap.points !== false;
+            document.getElementById("snapGrid").checked = snap.grid !== false;
+            document.getElementById("snapTolerancePx").value =
+                Number.isFinite(Number(snap.tolerancePx))
+                    ? Number(snap.tolerancePx)
+                    : 12;
+
+            const snapCandidate = GeoFEMSnap.candidatoActual(projectState);
+            const snapLabel = GeoFEMSnap.etiquetaCandidato(snapCandidate);
+            document.getElementById("propSnapCandidate").textContent = snapLabel;
+            document.getElementById("txt-snap").textContent =
+                snap.enabled === false ? "OFF" : snapLabel;
+
             const nombreHerramienta =
                 nombreHerramientaCad(projectState.ui.activeTool);
 
@@ -2407,6 +2535,12 @@
                 projectState.viewport
             );
 
+            GeoFEMSnap.renderIndicator(
+                document.getElementById("snapLayer"),
+                projectState,
+                projectState.viewport
+            );
+
             GeoFEMViewport.renderReferenceAxes(
                 document.getElementById("coordinateReferenceLayer"),
                 projectState.viewport
@@ -2450,6 +2584,39 @@
             x.textContent = puntoModelo.x.toFixed(2);
             y.textContent = puntoModelo.y.toFixed(2);
 
+        }
+
+        function actualizarConfiguracionSnapDesdePanel(){
+            if(!projectState?.viewport?.snap){
+                return;
+            }
+
+            const tolerancia = Number(
+                document.getElementById("snapTolerancePx").value
+            );
+
+            projectState.viewport.snap.enabled =
+                document.getElementById("snapEnabled").checked;
+            projectState.viewport.snap.points =
+                document.getElementById("snapPoints").checked;
+            projectState.viewport.snap.grid =
+                document.getElementById("snapGrid").checked;
+            projectState.viewport.snap.tolerancePx =
+                Math.min(Math.max(Number.isFinite(tolerancia) ? tolerancia : 12, 2), 40);
+
+            GeoFEMSnap.limpiarCandidato(projectState);
+            renderizarViewportCad();
+        }
+
+        function alternarSnapCad(){
+            if(!projectState?.viewport?.snap){
+                return;
+            }
+
+            projectState.viewport.snap.enabled =
+                projectState.viewport.snap.enabled === false;
+            GeoFEMSnap.limpiarCandidato(projectState);
+            renderizarViewportCad();
         }
 
         function nombreHerramientaCad(herramienta){
@@ -2573,6 +2740,7 @@
             }
 
             projectState.ui.activeTool = herramienta;
+            GeoFEMSnap.limpiarCandidato(projectState);
             actualizarHerramientasCadUi();
             actualizarPanelDesdeProjectState();
         }
@@ -2767,14 +2935,46 @@
             };
 
             function actualizarCursorDesdeEvento(evento){
-                const conversion = GeoFEMViewport.eventToModel(
+                const herramienta = projectState?.ui?.activeTool || "select";
+                const usarSnap =
+                    projectState?.ui?.activeModule === "geometria" &&
+                    ["point", "line", "polyline"].includes(herramienta);
+
+                if(!usarSnap){
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    const conversion = GeoFEMViewport.eventToModel(
+                        svg,
+                        evento,
+                        projectState.viewport
+                    );
+                    actualizarLecturaCursor(conversion.model);
+                    return {
+                        raw: conversion,
+                        candidate: null,
+                        model: conversion.model,
+                        svg: conversion.svg,
+                    };
+                }
+
+                const snapResult = GeoFEMSnap.resolverEvento(
                     svg,
                     evento,
-                    projectState.viewport
+                    projectState,
+                    projectState.viewport,
+                    {
+                        allowPoint: true,
+                        // Línea y polilínea necesitan IDs de puntos existentes.
+                        // El grid se usa para crear puntos libres con precisión.
+                        allowGrid: herramienta === "point",
+                    }
                 );
 
-                actualizarLecturaCursor(conversion.model);
-                return conversion;
+                GeoFEMSnap.establecerCandidato(
+                    projectState,
+                    snapResult.candidate
+                );
+                actualizarLecturaCursor(snapResult.model);
+                return snapResult;
             }
 
             svg.addEventListener("wheel", (evento) => {
@@ -2793,8 +2993,8 @@
                     anclaSvg
                 );
 
-                renderizarViewportCad();
                 actualizarCursorDesdeEvento(evento);
+                renderizarViewportCad();
             }, {passive:false});
 
             svg.addEventListener("pointerdown", (evento) => {
@@ -2832,10 +3032,23 @@
 
                 if(herramienta === "point"){
                     evento.preventDefault();
+
+                    if(conversion.candidate?.type === "point"){
+                        GeoFEMGeometry.seleccionarPunto(
+                            projectState,
+                            conversion.candidate.pointId
+                        );
+                        renderizarViewportCad();
+                        document.getElementById("txt-status").textContent =
+                            `Snap: ${conversion.candidate.pointId} ya existe; se seleccionó el punto existente.`;
+                        return;
+                    }
+
                     const punto = GeoFEMGeometry.crearPunto(
                         projectState,
                         conversion.model
                     );
+                    GeoFEMSnap.limpiarCandidato(projectState);
                     renderizarProjectState();
                     actualizarLecturaCursor(conversion.model);
                     console.log("[GeoFEM] Punto creado:", punto);
@@ -2844,25 +3057,29 @@
 
                 if(herramienta === "line"){
                     evento.preventDefault();
-                    const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
 
-                    if(entidad?.type !== "point"){
+                    if(!puntoObjetivoId){
                         return;
                     }
 
                     const inicioId = projectState.ui.lineDraftStartPointId;
                     if(!inicioId){
-                        projectState.ui.lineDraftStartPointId = entidad.id;
-                        GeoFEMGeometry.seleccionarPunto(projectState, entidad.id);
+                        projectState.ui.lineDraftStartPointId = puntoObjetivoId;
+                        GeoFEMGeometry.seleccionarPunto(projectState, puntoObjetivoId);
                         renderizarViewportCad();
-                        console.log(`[GeoFEM] Línea: punto inicial ${entidad.id}`);
+                        console.log(`[GeoFEM] Línea: punto inicial ${puntoObjetivoId}`);
                         return;
                     }
 
                     const resultado = GeoFEMGeometry.crearLinea(
                         projectState,
                         inicioId,
-                        entidad.id
+                        puntoObjetivoId
                     );
 
                     if(!resultado.ok){
@@ -2884,15 +3101,19 @@
 
                 if(herramienta === "polyline"){
                     evento.preventDefault();
-                    const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
 
-                    if(entidad?.type !== "point"){
+                    if(!puntoObjetivoId){
                         return;
                     }
 
                     const resultado = GeoFEMGeometry.agregarVerticeBorradorPolilinea(
                         projectState,
-                        entidad.id
+                        puntoObjetivoId
                     );
 
                     if(!resultado.ok){
@@ -2949,10 +3170,14 @@
                 }
 
                 const conversion = actualizarCursorDesdeEvento(evento);
+                const herramienta = projectState?.ui?.activeTool || "select";
+                let requiereRender =
+                    projectState?.ui?.activeModule === "geometria" &&
+                    ["point", "line", "polyline"].includes(herramienta);
 
                 if(
                     projectState?.ui?.activeModule === "geometria" &&
-                    projectState?.ui?.activeTool === "polyline" &&
+                    herramienta === "polyline" &&
                     Array.isArray(projectState.ui.polylineDraftPointIds) &&
                     projectState.ui.polylineDraftPointIds.length > 0
                 ){
@@ -2960,6 +3185,10 @@
                         projectState,
                         conversion.model
                     );
+                    requiereRender = true;
+                }
+
+                if(requiereRender){
                     renderizarViewportCad();
                 }
             });
@@ -2989,6 +3218,7 @@
             svg.addEventListener("pointerleave", () => {
                 if(!estadoPan.activo){
                     actualizarLecturaCursor(null);
+                    GeoFEMSnap.limpiarCandidato(projectState);
                     GeoFEMGeometry.actualizarCursorBorradorPolilinea(
                         projectState,
                         null
@@ -3008,9 +3238,16 @@
                     return;
                 }
 
+                if(evento.key === "F3"){
+                    evento.preventDefault();
+                    alternarSnapCad();
+                    return;
+                }
+
                 if(evento.key === "Escape"){
                     cancelarBorradorLinea();
                     cancelarBorradorPolilinea();
+                    GeoFEMSnap.limpiarCandidato(projectState);
                     GeoFEMGeometry.limpiarSeleccion(projectState);
                     renderizarViewportCad();
                     return;
@@ -3050,6 +3287,7 @@
 
         function restablecerVistaCad(){
             GeoFEMViewport.resetView(projectState.viewport);
+            GeoFEMSnap.limpiarCandidato(projectState);
             renderizarViewportCad();
             actualizarLecturaCursor(null);
         }

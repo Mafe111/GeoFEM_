@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.3.0";
+    const STATE_SCHEMA_VERSION = "1.4.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -122,8 +122,13 @@
                     majorEvery: 5,
                 },
                 snap: {
-                    enabled: false,
-                    tolerancePx: 10,
+                    // El snap es una ayuda de precisión del viewport; no cambia
+                    // por sí mismo la geometría existente. En este paso se
+                    // soportan dos modos: vértices existentes y grid visible.
+                    enabled: true,
+                    points: true,
+                    grid: true,
+                    tolerancePx: 12,
                 },
             },
 
@@ -134,6 +139,10 @@
                 lineDraftStartPointId: null,
                 polylineDraftPointIds: [],
                 polylineDraftCursorModel: null,
+
+                // Candidato temporal de snap bajo el cursor. Es estado de UI,
+                // no geometría persistente y nunca debe marcar dirty.
+                snapCandidate: null,
             },
 
             dirty: false,
