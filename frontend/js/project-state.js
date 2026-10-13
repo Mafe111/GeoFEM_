@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.0.0";
+    const STATE_SCHEMA_VERSION = "1.1.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -46,6 +46,15 @@
                 lines: [],
                 polylines: [],
                 regions: [],
+
+                // Contadores monotónicos para mantener identificadores estables.
+                // Si P2 se elimina, el siguiente punto será P4 (no se reutiliza P2).
+                nextIds: {
+                    point: 1,
+                    line: 1,
+                    polyline: 1,
+                    region: 1,
+                },
             },
 
             materials: [],

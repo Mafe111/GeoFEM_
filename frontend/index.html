@@ -762,6 +762,20 @@
             background:#b7ece0;
         }
 
+        .tool-btn.active-tool{
+            background:#ccfbf1;
+            border-color:#2dd4bf;
+            color:#0f766e;
+            font-weight:700;
+            box-shadow:0 0 0 2px rgba(45,212,191,0.10);
+        }
+
+        .tool-btn:disabled{
+            cursor:not-allowed;
+            opacity:0.55;
+            background:#f8fafc;
+        }
+
         .cad-area{
             flex:1;
 
@@ -847,6 +861,14 @@
     cursor:grabbing;
 }
 
+#cadSvg.tool-select{
+    cursor:default;
+}
+
+#cadSvg.tool-point{
+    cursor:crosshair;
+}
+
 /* Capas del viewport CAD. En este Sprint son una estructura vacía
    preparada para geometría, malla, restricciones y resultados. */
 #viewportContent > g{
@@ -898,6 +920,91 @@
     font-size:11px;
     line-height:1.45;
 }
+
+.point-editor-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin:10px 0 12px;
+}
+
+.point-editor-field label{
+    display:block;
+    margin-bottom:5px;
+    color:#475569;
+    font-size:12px;
+    font-weight:700;
+}
+
+.point-editor-field input{
+    width:100%;
+    box-sizing:border-box;
+    border:1px solid #cbd5e1;
+    border-radius:9px;
+    padding:8px 9px;
+    background:#ffffff;
+    color:#0f172a;
+    font-family:Consolas, "Courier New", monospace;
+}
+
+.point-editor-field input:focus{
+    outline:none;
+    border-color:#14b8a6;
+    box-shadow:0 0 0 2px rgba(20,184,166,0.12);
+}
+
+.property-action-row{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+}
+
+.property-action-btn{
+    flex:1;
+    border:1px solid #cbd5e1;
+    border-radius:9px;
+    padding:8px 9px;
+    background:#ffffff;
+    color:#334155;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.property-action-btn:hover{
+    border-color:#14b8a6;
+    background:#f0fdfa;
+    color:#0f766e;
+}
+
+.property-action-btn.danger{
+    border-color:#fecaca;
+    color:#b91c1c;
+    background:#fff7f7;
+}
+
+.property-action-btn.danger:hover{
+    border-color:#ef4444;
+    background:#fef2f2;
+    color:#991b1b;
+}
+
+.selection-hint{
+    margin-top:8px;
+    font-size:11px;
+    line-height:1.4;
+    color:#64748b;
+}
+
+.tool-btn.danger-tool{
+    border-color:#fecaca;
+    color:#b91c1c;
+}
+
+.tool-btn.danger-tool:hover:not(:disabled){
+    background:#fef2f2;
+    border-color:#ef4444;
+}
+
 
 #coordinateReferenceLayer{
     pointer-events:none;
@@ -1374,20 +1481,42 @@
 
         <div id="toolPanel">
 
-            <button class="tool-btn">
-                📁 Importar DXF
+            <button
+                class="tool-btn active-tool"
+                data-cad-tool="select"
+                onclick="activarHerramientaCad('select')"
+            >
+                ↖ Seleccionar
             </button>
 
-            <button class="tool-btn">
-                ✏ Dibujar Estrato
+            <button
+                class="tool-btn"
+                data-cad-tool="point"
+                onclick="activarHerramientaCad('point')"
+            >
+                • Crear Punto
             </button>
 
-            <button class="tool-btn">
-                ✏ Dibujar Línea
+            <button class="tool-btn" disabled title="Se integrará en un paso posterior">
+                📁 Importar DXF · próximamente
             </button>
 
-            <button class="tool-btn">
-                🧹 Limpiar
+            <button class="tool-btn" disabled title="Se construirá después de validar puntos y líneas">
+                ✏ Dibujar Estrato · próximamente
+            </button>
+
+            <button class="tool-btn" disabled title="Se construirá en el siguiente bloque CAD">
+                ✏ Dibujar Línea · próximamente
+            </button>
+
+            <button
+                id="btnEliminarPuntoSeleccionado"
+                class="tool-btn danger-tool"
+                onclick="eliminarPuntoSeleccionadoCad()"
+                disabled
+                title="Selecciona un punto para eliminarlo"
+            >
+                🗑 Eliminar seleccionado
             </button>
 
         </div>
@@ -1500,6 +1629,11 @@
                 State --
             </span>
 
+            <p style="margin-top:12px;">
+                Edición local:
+                <span id="propDirtyState">Sin cambios</span>
+            </p>
+
         </div>
 
         <div class="property-card">
@@ -1530,7 +1664,76 @@
 
         <div class="property-card">
 
+            <h4>Selección CAD</h4>
+
+            <div id="propSelectionEmpty">
+                <p>Sin selección.</p>
+                <p style="font-size:12px; color:#64748b;">
+                    Usa ↖ Seleccionar y haz clic sobre un punto.
+                </p>
+            </div>
+
+            <div id="propSelectionPoint" style="display:none;">
+                <p>
+                    Tipo: <strong>Punto</strong>
+                </p>
+                <p>
+                    ID: <span id="propSelectedPointId" class="coordinate-value">--</span>
+                </p>
+
+                <div class="point-editor-grid">
+                    <div class="point-editor-field">
+                        <label for="inputSelectedPointX">X (m)</label>
+                        <input
+                            id="inputSelectedPointX"
+                            type="number"
+                            step="any"
+                            inputmode="decimal"
+                            onkeydown="if(event.key==='Enter'){actualizarPuntoSeleccionadoDesdePanel();}"
+                        />
+                    </div>
+                    <div class="point-editor-field">
+                        <label for="inputSelectedPointY">Y (m)</label>
+                        <input
+                            id="inputSelectedPointY"
+                            type="number"
+                            step="any"
+                            inputmode="decimal"
+                            onkeydown="if(event.key==='Enter'){actualizarPuntoSeleccionadoDesdePanel();}"
+                        />
+                    </div>
+                </div>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="actualizarPuntoSeleccionadoDesdePanel()"
+                    >
+                        Aplicar coordenadas
+                    </button>
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarPuntoSeleccionadoCad()"
+                    >
+                        Eliminar punto
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    El ID del punto se conserva al editar. También puedes usar la tecla Supr para eliminar la selección.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="property-card">
+
             <h4>Viewport CAD</h4>
+
+            <p>
+                Herramienta:
+                <span id="propCadTool">Seleccionar</span>
+            </p>
 
             <p>
                 Unidades:
@@ -1638,6 +1841,13 @@
 
     <div>
 
+        Herramienta:
+        <span id="txt-tool">Seleccionar</span>
+
+    </div>
+
+    <div>
+
         Estado:
 
         <span id="txt-status">
@@ -1657,6 +1867,7 @@
     <!-- Modelo interno y transformaciones CAD. Deben cargarse antes del JS inline. -->
     <script src="js/project-state.js"></script>
     <script src="js/viewport.js"></script>
+    <script src="js/cad-geometry.js"></script>
 
     <script>
 
@@ -1956,6 +2167,10 @@
                 proyecto.codigo || "--";
             document.getElementById("propStateVersion").textContent =
                 `State ${projectState.schemaVersion}`;
+            document.getElementById("propDirtyState").textContent =
+                projectState.dirty
+                    ? "Cambios locales sin guardar"
+                    : "Sin cambios";
 
             document.getElementById("propPuntos").textContent =
                 resumen.geometry.points;
@@ -1993,6 +2208,37 @@
             document.getElementById("txt-zoom").textContent =
                 zoomPorcentaje;
 
+            const nombreHerramienta =
+                projectState.ui.activeTool === "point"
+                    ? "Crear Punto"
+                    : "Seleccionar";
+
+            document.getElementById("propCadTool").textContent =
+                nombreHerramienta;
+            document.getElementById("txt-tool").textContent =
+                nombreHerramienta;
+
+            const puntoSeleccionado =
+                GeoFEMGeometry.puntoSeleccionado(projectState);
+            const vacioSeleccion =
+                document.getElementById("propSelectionEmpty");
+            const detallePunto =
+                document.getElementById("propSelectionPoint");
+
+            if(puntoSeleccionado){
+                vacioSeleccion.style.display = "none";
+                detallePunto.style.display = "block";
+                document.getElementById("propSelectedPointId").textContent =
+                    puntoSeleccionado.id;
+                document.getElementById("inputSelectedPointX").value =
+                    puntoSeleccionado.x.toFixed(3);
+                document.getElementById("inputSelectedPointY").value =
+                    puntoSeleccionado.y.toFixed(3);
+            } else {
+                vacioSeleccion.style.display = "block";
+                detallePunto.style.display = "none";
+            }
+
         }
 
         function actualizarEstadoVacioCad(){
@@ -2018,24 +2264,39 @@
                 projectState.viewport
             );
 
+            // La geometría se vuelve a dibujar desde projectState después de
+            // cada zoom o pan. Así los objetos conservan coordenadas reales
+            // y solo cambia su representación en pantalla.
+            GeoFEMGeometry.renderGeometry(
+                document.getElementById("geometryLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            GeoFEMGeometry.renderSelection(
+                document.getElementById("selectionLayer"),
+                projectState,
+                projectState.viewport
+            );
+
             GeoFEMViewport.renderReferenceAxes(
                 document.getElementById("coordinateReferenceLayer"),
                 projectState.viewport
             );
 
             actualizarPanelDesdeProjectState();
+            actualizarHerramientasCadUi();
 
         }
 
         function renderizarProjectState(){
 
-            // Las entidades del modelo siguen vacías en este paso. Zoom, pan y
-            // grid modifican solamente la cámara; nunca alteran la geometría.
-            limpiarCapaSvg("geometryLayer");
+            // Geometría y selección se renderizan desde projectState dentro de
+            // renderizarViewportCad(). Las demás capas todavía no contienen
+            // entidades reales en este paso.
             limpiarCapaSvg("meshLayer");
             limpiarCapaSvg("boundaryLayer");
             limpiarCapaSvg("resultLayer");
-            limpiarCapaSvg("selectionLayer");
 
             actualizarEstadoVacioCad();
             renderizarViewportCad();
@@ -2061,6 +2322,170 @@
             x.textContent = puntoModelo.x.toFixed(2);
             y.textContent = puntoModelo.y.toFixed(2);
 
+        }
+
+        function nombreHerramientaCad(herramienta){
+            return herramienta === "point" ? "Crear Punto" : "Seleccionar";
+        }
+
+        function htmlPanelGeometria(){
+            return `
+                <button
+                    class="tool-btn"
+                    data-cad-tool="select"
+                    onclick="activarHerramientaCad('select')"
+                >
+                    ↖ Seleccionar
+                </button>
+
+                <button
+                    class="tool-btn"
+                    data-cad-tool="point"
+                    onclick="activarHerramientaCad('point')"
+                >
+                    • Crear Punto
+                </button>
+
+                <button class="tool-btn" disabled title="Se integrará en un paso posterior">
+                    📁 Importar DXF · próximamente
+                </button>
+
+                <button class="tool-btn" disabled title="Se construirá después de validar puntos y líneas">
+                    ✏ Dibujar Estrato · próximamente
+                </button>
+
+                <button class="tool-btn" disabled title="Se construirá en el siguiente bloque CAD">
+                    ✏ Dibujar Línea · próximamente
+                </button>
+
+                <button
+                    id="btnEliminarPuntoSeleccionado"
+                    class="tool-btn danger-tool"
+                    onclick="eliminarPuntoSeleccionadoCad()"
+                    disabled
+                    title="Selecciona un punto para eliminarlo"
+                >
+                    🗑 Eliminar seleccionado
+                </button>
+            `;
+        }
+
+        function actualizarHerramientasCadUi(){
+            const herramienta = projectState?.ui?.activeTool || "select";
+            const svg = document.getElementById("cadSvg");
+
+            document.querySelectorAll("[data-cad-tool]").forEach((boton) => {
+                boton.classList.toggle(
+                    "active-tool",
+                    boton.dataset.cadTool === herramienta
+                );
+            });
+
+            svg.classList.toggle(
+                "tool-point",
+                projectState?.ui?.activeModule === "geometria" &&
+                herramienta === "point"
+            );
+            svg.classList.toggle(
+                "tool-select",
+                projectState?.ui?.activeModule !== "geometria" ||
+                herramienta === "select"
+            );
+
+            const botonEliminar =
+                document.getElementById("btnEliminarPuntoSeleccionado");
+            if(botonEliminar){
+                botonEliminar.disabled =
+                    !GeoFEMGeometry.puntoSeleccionado(projectState);
+            }
+        }
+
+        function activarHerramientaCad(herramienta){
+            if(!projectState?.ui){
+                return;
+            }
+
+            if(!["select", "point"].includes(herramienta)){
+                return;
+            }
+
+            projectState.ui.activeTool = herramienta;
+            actualizarHerramientasCadUi();
+            actualizarPanelDesdeProjectState();
+        }
+
+        function actualizarPuntoSeleccionadoDesdePanel(){
+            const punto = GeoFEMGeometry.puntoSeleccionado(projectState);
+            if(!punto){
+                alert("Selecciona primero un punto para editarlo.");
+                return;
+            }
+
+            const inputX = document.getElementById("inputSelectedPointX");
+            const inputY = document.getElementById("inputSelectedPointY");
+
+            if(inputX.value.trim() === "" || inputY.value.trim() === ""){
+                alert("X e Y son obligatorios para editar el punto.");
+                return;
+            }
+
+            const x = Number(inputX.value);
+            const y = Number(inputY.value);
+
+            if(!Number.isFinite(x) || !Number.isFinite(y)){
+                alert("X e Y deben ser valores numéricos válidos.");
+                return;
+            }
+
+            const resultado = GeoFEMGeometry.actualizarPunto(
+                projectState,
+                punto.id,
+                {x, y}
+            );
+
+            if(!resultado.ok){
+                alert("No fue posible actualizar el punto seleccionado.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Punto actualizado:", resultado.punto);
+        }
+
+        function eliminarPuntoSeleccionadoCad(){
+            const punto = GeoFEMGeometry.puntoSeleccionado(projectState);
+            if(!punto){
+                return;
+            }
+
+            const confirmar = window.confirm(
+                `¿Eliminar ${punto.id} (${punto.x.toFixed(3)}, ${punto.y.toFixed(3)}) m? ` +
+                "Esta acción todavía no puede deshacerse."
+            );
+
+            if(!confirmar){
+                return;
+            }
+
+            const resultado =
+                GeoFEMGeometry.eliminarPuntoSeleccionado(projectState);
+
+            if(!resultado.ok && resultado.reason === "referenced"){
+                alert(
+                    `No se puede eliminar ${punto.id} porque está conectado a ` +
+                    `${resultado.referencias.length} línea(s). ` +
+                    "Primero deberán eliminarse o reasignarse esas líneas."
+                );
+                return;
+            }
+
+            if(!resultado.ok){
+                alert("No fue posible eliminar el punto seleccionado.");
+                return;
+            }
+
+            renderizarProjectState();
+            console.log("[GeoFEM] Punto eliminado:", resultado.punto);
         }
 
         function configurarInteraccionViewportCad(){
@@ -2107,21 +2532,58 @@
                 const botonCentral = evento.button === 1;
                 const shiftIzquierdo = evento.button === 0 && evento.shiftKey;
 
-                if(!botonCentral && !shiftIzquierdo){
+                // El pan tiene prioridad sobre cualquier herramienta CAD.
+                if(botonCentral || shiftIzquierdo){
+                    evento.preventDefault();
+                    estadoPan.activo = true;
+                    estadoPan.pointerId = evento.pointerId;
+                    estadoPan.ultimoSvg = GeoFEMViewport.clientToSvg(
+                        svg,
+                        evento.clientX,
+                        evento.clientY
+                    );
+
+                    svg.setPointerCapture(evento.pointerId);
+                    svg.classList.add("is-panning");
                     return;
                 }
 
-                evento.preventDefault();
-                estadoPan.activo = true;
-                estadoPan.pointerId = evento.pointerId;
-                estadoPan.ultimoSvg = GeoFEMViewport.clientToSvg(
-                    svg,
-                    evento.clientX,
-                    evento.clientY
-                );
+                if(evento.button !== 0){
+                    return;
+                }
 
-                svg.setPointerCapture(evento.pointerId);
-                svg.classList.add("is-panning");
+                // Fuera del módulo Geometría no permitimos crear/seleccionar
+                // entidades CAD en este paso.
+                if(projectState?.ui?.activeModule !== "geometria"){
+                    return;
+                }
+
+                const conversion = actualizarCursorDesdeEvento(evento);
+                const herramienta = projectState.ui.activeTool || "select";
+
+                if(herramienta === "point"){
+                    evento.preventDefault();
+                    const punto = GeoFEMGeometry.crearPunto(
+                        projectState,
+                        conversion.model
+                    );
+                    renderizarProjectState();
+                    actualizarLecturaCursor(conversion.model);
+                    console.log("[GeoFEM] Punto creado:", punto);
+                    return;
+                }
+
+                if(herramienta === "select"){
+                    const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+
+                    if(entidad?.type === "point"){
+                        GeoFEMGeometry.seleccionarPunto(projectState, entidad.id);
+                    } else {
+                        GeoFEMGeometry.limpiarSeleccion(projectState);
+                    }
+
+                    renderizarViewportCad();
+                }
             });
 
             svg.addEventListener("pointermove", (evento) => {
@@ -2173,6 +2635,31 @@
                 }
             });
 
+            document.addEventListener("keydown", (evento) => {
+                const etiqueta = document.activeElement?.tagName?.toLowerCase();
+                const editandoCampo =
+                    etiqueta === "input" ||
+                    etiqueta === "textarea" ||
+                    document.activeElement?.isContentEditable;
+
+                if(editandoCampo){
+                    return;
+                }
+
+                if(evento.key === "Escape"){
+                    GeoFEMGeometry.limpiarSeleccion(projectState);
+                    renderizarViewportCad();
+                    return;
+                }
+
+                if(evento.key === "Delete"){
+                    if(GeoFEMGeometry.puntoSeleccionado(projectState)){
+                        evento.preventDefault();
+                        eliminarPuntoSeleccionadoCad();
+                    }
+                }
+            });
+
             // Prueba numérica de ida y vuelta. Si las transformaciones son
             // correctas, recuperar (10,5) debe producir prácticamente (10,5).
             const prueba = GeoFEMViewport.roundTripError(
@@ -2208,6 +2695,7 @@
                 `Proyecto #${projectState.project.id} · ${projectState.project.codigo}`;
 
             renderizarProjectState();
+            actualizarHerramientasCadUi();
 
             console.log("[GeoFEM] Proyecto activo:", proyectoActivo);
             console.log("[GeoFEM] Estado central:", projectState);
@@ -2231,6 +2719,18 @@
         }
 
         function volverAlDashboard(){
+
+            if(projectState?.dirty){
+                const salir = window.confirm(
+                    "La geometría CAD creada en este paso todavía vive solo en memoria " +
+                    "y aún no se guarda en MySQL. Si vuelves al Dashboard, perderás " +
+                    "los puntos locales de esta sesión. ¿Deseas continuar?"
+                );
+
+                if(!salir){
+                    return;
+                }
+            }
 
             mostrarPantalla("dashboard");
             cargarProyectosDashboard();
@@ -2337,6 +2837,10 @@ function cambiarModulo(modulo, boton){
 
     if(projectState && projectState.ui){
         projectState.ui.activeModule = modulo;
+
+        if(modulo !== "geometria"){
+            projectState.ui.activeTool = "select";
+        }
     }
 
     document
@@ -2370,25 +2874,8 @@ function cambiarModulo(modulo, boton){
         titulo.innerText =
             "Geometría";
 
-        panel.innerHTML=`
-
-            <button class="tool-btn">
-                📁 Importar DXF
-            </button>
-
-            <button class="tool-btn">
-                ✏ Dibujar Estrato
-            </button>
-
-            <button class="tool-btn">
-                ✏ Dibujar Línea
-            </button>
-
-            <button class="tool-btn">
-                🧹 Limpiar
-            </button>
-
-        `;
+        panel.innerHTML = htmlPanelGeometria();
+        actualizarHerramientasCadUi();
     }
 
     if(modulo==="malla"){
@@ -2492,6 +2979,9 @@ function cambiarModulo(modulo, boton){
 
         `;
     }
+
+    actualizarHerramientasCadUi();
+    actualizarPanelDesdeProjectState();
 
 }
     </script>
