@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.4.0";
+    const STATE_SCHEMA_VERSION = "1.5.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -139,6 +139,12 @@
                 lineDraftStartPointId: null,
                 polylineDraftPointIds: [],
                 polylineDraftCursorModel: null,
+
+                // Borrador de región cerrada. Almacena IDs únicos; el primer
+                // punto NO se repite al final. El cierre es una propiedad
+                // topológica implícita de la entidad Region.
+                regionDraftPointIds: [],
+                regionDraftCursorModel: null,
 
                 // Candidato temporal de snap bajo el cursor. Es estado de UI,
                 // no geometría persistente y nunca debe marcar dirty.

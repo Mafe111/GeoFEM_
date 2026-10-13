@@ -1,7 +1,7 @@
 /*
  * GeoFEM - Geometría CAD básica
  * -----------------------------
- * Sprint 1 / Paso 7
+ * Sprint 1 / Paso 9
  *
  * Responsabilidades actuales:
  *   - crear, seleccionar, editar y eliminar puntos;
@@ -54,6 +54,13 @@
             return [];
         }
         return state.geometry.polylines;
+    }
+
+    function regiones(state) {
+        if (!state?.geometry || !Array.isArray(state.geometry.regions)) {
+            return [];
+        }
+        return state.geometry.regions;
     }
 
     function asegurarNextIds(state) {
@@ -258,6 +265,13 @@
         );
     }
 
+    function regionesQueUsanPunto(state, id) {
+        return regiones(state).filter((region) =>
+            Array.isArray(region.pointIds) &&
+            region.pointIds.some((pointId) => String(pointId) === String(id))
+        );
+    }
+
     function referenciasQueUsanPunto(state, id) {
         return [
             ...lineasQueUsanPunto(state, id).map((linea) => ({
@@ -267,6 +281,10 @@
             ...polilineasQueUsanPunto(state, id).map((polilinea) => ({
                 type: "polyline",
                 id: polilinea.id,
+            })),
+            ...regionesQueUsanPunto(state, id).map((region) => ({
+                type: "region",
+                id: region.id,
             })),
         ];
     }
@@ -563,7 +581,7 @@
             return 0;
         }
 
-        if (lineas(state).length > 0 || polilineas(state).length > 0) {
+        if (lineas(state).length > 0 || polilineas(state).length > 0 || regiones(state).length > 0) {
             return 0;
         }
 
@@ -924,6 +942,7 @@
         limpiarSeleccion,
         lineasQueUsanPunto,
         polilineasQueUsanPunto,
+        regionesQueUsanPunto,
         referenciasQueUsanPunto,
         eliminarPunto,
         eliminarPuntoSeleccionado,
