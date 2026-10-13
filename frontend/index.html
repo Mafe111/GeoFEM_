@@ -1899,11 +1899,37 @@
                 <p>
                     Perímetro: <span id="propSelectedRegionPerimeter" class="coordinate-value">--</span> m
                 </p>
+                <p>
+                    Sentido: <span id="propSelectedRegionOrientation" class="coordinate-value">--</span>
+                </p>
                 <p style="font-size:12px; line-height:1.45;">
                     Contorno: <span id="propSelectedRegionSequence" class="coordinate-value">--</span>
                 </p>
 
                 <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="iniciarInsercionVerticeRegionCad()"
+                        title="Haz clic sobre un borde de la región para insertar un nuevo vértice"
+                    >
+                        + Vértice en borde
+                    </button>
+                    <button
+                        class="property-action-btn"
+                        onclick="iniciarQuitarVerticeRegionCad()"
+                        title="Haz clic sobre un vértice para quitarlo del contorno; el punto se conserva"
+                    >
+                        − Vértice del contorno
+                    </button>
+                </div>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="invertirRegionSeleccionadaCad()"
+                    >
+                        ⇄ Invertir sentido
+                    </button>
                     <button
                         class="property-action-btn danger"
                         onclick="eliminarRegionSeleccionadaCad()"
@@ -1913,7 +1939,7 @@
                 </div>
 
                 <div class="selection-hint">
-                    La región está cerrada de forma implícita: el primer punto no se duplica al final. Editar un vértice actualiza automáticamente el área y el perímetro.
+                    La región está cerrada de forma implícita. Puedes insertar o quitar vértices sin borrar los puntos independientes. Una edición que genere área cero o autointersecciones será rechazada.
                 </div>
             </div>
 
@@ -2558,6 +2584,14 @@
                     area === null ? "--" : area.toFixed(3);
                 document.getElementById("propSelectedRegionPerimeter").textContent =
                     perimetro === null ? "--" : perimetro.toFixed(3);
+                const orientacion = GeoFEMRegions.orientacionRegion(
+                    projectState,
+                    regionSeleccionada
+                );
+                document.getElementById("propSelectedRegionOrientation").textContent =
+                    orientacion === "antihorario"
+                        ? "Antihorario (CCW)"
+                        : (orientacion === "horario" ? "Horario (CW)" : "--");
                 document.getElementById("propSelectedRegionSequence").textContent =
                     `${regionSeleccionada.pointIds.join(" → ")} → ${regionSeleccionada.pointIds[0]}`;
             } else {
@@ -2707,6 +2741,8 @@
             if(herramienta === "line") return "Crear Línea";
             if(herramienta === "polyline") return "Crear Polilínea";
             if(herramienta === "region") return "Crear Región";
+            if(herramienta === "region-insert") return "Insertar vértice en región";
+            if(herramienta === "region-remove") return "Quitar vértice de región";
             return "Seleccionar";
         }
 
@@ -2825,7 +2861,15 @@
                 return;
             }
 
-            if(!["select", "point", "line", "polyline", "region"].includes(herramienta)){
+            if(![
+                "select",
+                "point",
+                "line",
+                "polyline",
+                "region",
+                "region-insert",
+                "region-remove"
+            ].includes(herramienta)){
                 return;
             }
 
@@ -2839,6 +2883,10 @@
 
             if(herramienta !== "region"){
                 GeoFEMRegions.cancelarBorradorRegion(projectState);
+            }
+
+            if(!["region-insert", "region-remove"].includes(herramienta)){
+                GeoFEMRegions.cancelarEdicionRegion(projectState);
             }
 
             projectState.ui.activeTool = herramienta;
@@ -2877,7 +2925,24 @@
             );
 
             if(!resultado.ok){
-                alert("No fue posible actualizar el punto seleccionado.");
+                if(resultado.reason === "self_intersection"){
+                    alert(
+                        `No se puede mover ${punto.id}: la edición haría que ` +
+                        `${resultado.regionId || "una región"} se cruce consigo misma.`
+                    );
+                } else if(resultado.reason === "zero_area"){
+                    alert(
+                        `No se puede mover ${punto.id}: la edición dejaría ` +
+                        `${resultado.regionId || "una región"} con área cero.`
+                    );
+                } else if(resultado.reason === "duplicate_position"){
+                    alert(
+                        `No se puede mover ${punto.id}: coincidiría exactamente con ` +
+                        `otro vértice de ${resultado.regionId || "una región"}.`
+                    );
+                } else {
+                    alert("No fue posible actualizar el punto seleccionado.");
+                }
                 return;
             }
 
@@ -3011,6 +3076,60 @@
             console.log("[GeoFEM] Región eliminada:", resultado.region);
         }
 
+        function iniciarInsercionVerticeRegionCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region){
+                alert("Selecciona primero una región.");
+                return;
+            }
+
+            GeoFEMRegions.iniciarEdicionRegion(projectState, region.id);
+            activarHerramientaCad("region-insert");
+            document.getElementById("txt-status").textContent =
+                `Edición ${region.id}: haz clic cerca del borde donde quieras insertar el nuevo vértice.`;
+            renderizarViewportCad();
+        }
+
+        function iniciarQuitarVerticeRegionCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region){
+                alert("Selecciona primero una región.");
+                return;
+            }
+
+            if(region.pointIds.length <= 3){
+                alert(
+                    `${region.id} ya tiene el mínimo de 3 vértices. ` +
+                    "No es posible quitar otro vértice del contorno."
+                );
+                return;
+            }
+
+            GeoFEMRegions.iniciarEdicionRegion(projectState, region.id);
+            activarHerramientaCad("region-remove");
+            document.getElementById("txt-status").textContent =
+                `Edición ${region.id}: haz clic sobre el vértice que quieras quitar del contorno.`;
+            renderizarViewportCad();
+        }
+
+        function invertirRegionSeleccionadaCad(){
+            const region = GeoFEMRegions.regionSeleccionada(projectState);
+            if(!region) return;
+
+            const antes = GeoFEMRegions.orientacionRegion(projectState, region);
+            const resultado = GeoFEMRegions.invertirRegion(projectState, region.id);
+            if(!resultado.ok){
+                alert("No fue posible invertir el sentido de la región.");
+                return;
+            }
+
+            renderizarProjectState();
+            const despues = GeoFEMRegions.orientacionRegion(projectState, resultado.region);
+            console.log(
+                `[GeoFEM] ${region.id}: orientación ${antes} → ${despues}`
+            );
+        }
+
         function eliminarEntidadSeleccionadaCad(){
             if(GeoFEMGeometry.puntoSeleccionado(projectState)){
                 eliminarPuntoSeleccionadoCad();
@@ -3101,7 +3220,7 @@
                 const herramienta = projectState?.ui?.activeTool || "select";
                 const usarSnap =
                     projectState?.ui?.activeModule === "geometria" &&
-                    ["point", "line", "polyline", "region"].includes(herramienta);
+                    ["point", "line", "polyline", "region", "region-remove"].includes(herramienta);
 
                 if(!usarSnap){
                     GeoFEMSnap.limpiarCandidato(projectState);
@@ -3339,6 +3458,105 @@
                     return;
                 }
 
+                if(herramienta === "region-insert"){
+                    evento.preventDefault();
+                    const region = GeoFEMRegions.regionObjetivoEdicion(projectState);
+                    if(!region){
+                        activarHerramientaCad("select");
+                        renderizarViewportCad();
+                        return;
+                    }
+
+                    const tolerancia = Math.max(
+                        14,
+                        Number(projectState?.viewport?.snap?.tolerancePx) || 12
+                    );
+                    const resultado = GeoFEMRegions.insertarVerticeEnBorde(
+                        projectState,
+                        region.id,
+                        projectState.viewport,
+                        conversion.svg,
+                        tolerancia
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "edge_not_found"){
+                            document.getElementById("txt-status").textContent =
+                                `Edición ${region.id}: haz clic más cerca de uno de sus bordes.`;
+                        } else if(resultado.reason === "near_endpoint"){
+                            alert(
+                                "El clic está demasiado cerca de un vértice existente. " +
+                                "Selecciona una zona intermedia del borde."
+                            );
+                        } else {
+                            alert("No fue posible insertar el vértice en la región.");
+                        }
+                        return;
+                    }
+
+                    projectState.ui.activeTool = "select";
+                    GeoFEMRegions.cancelarEdicionRegion(projectState);
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    renderizarProjectState();
+                    console.log(
+                        `[GeoFEM] ${region.id}: vértice ${resultado.punto.id} insertado`,
+                        resultado
+                    );
+                    return;
+                }
+
+                if(herramienta === "region-remove"){
+                    evento.preventDefault();
+                    const region = GeoFEMRegions.regionObjetivoEdicion(projectState);
+                    if(!region){
+                        activarHerramientaCad("select");
+                        renderizarViewportCad();
+                        return;
+                    }
+
+                    const entidadTarget = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+                    const puntoObjetivoId =
+                        conversion.candidate?.type === "point"
+                            ? conversion.candidate.pointId
+                            : (entidadTarget?.type === "point" ? entidadTarget.id : null);
+
+                    if(!puntoObjetivoId){
+                        document.getElementById("txt-status").textContent =
+                            `Edición ${region.id}: selecciona uno de sus vértices.`;
+                        return;
+                    }
+
+                    const resultado = GeoFEMRegions.quitarVerticeRegion(
+                        projectState,
+                        region.id,
+                        puntoObjetivoId
+                    );
+
+                    if(!resultado.ok){
+                        if(resultado.reason === "point_not_in_region"){
+                            alert(`${puntoObjetivoId} no pertenece al contorno de ${region.id}.`);
+                        } else if(resultado.reason === "minimum_vertices"){
+                            alert("Una región cerrada debe conservar al menos 3 vértices.");
+                        } else if(resultado.reason === "self_intersection"){
+                            alert("Quitar ese vértice produciría una autointersección.");
+                        } else if(resultado.reason === "zero_area"){
+                            alert("Quitar ese vértice dejaría la región con área cero.");
+                        } else {
+                            alert("No fue posible quitar el vértice del contorno.");
+                        }
+                        return;
+                    }
+
+                    projectState.ui.activeTool = "select";
+                    GeoFEMRegions.cancelarEdicionRegion(projectState);
+                    GeoFEMSnap.limpiarCandidato(projectState);
+                    renderizarProjectState();
+                    console.log(
+                        `[GeoFEM] ${region.id}: ${puntoObjetivoId} retirado del contorno; el punto se conserva.`
+                    );
+                    return;
+                }
+
                 if(herramienta === "select"){
                     const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
 
@@ -3380,7 +3598,14 @@
                 const herramienta = projectState?.ui?.activeTool || "select";
                 let requiereRender =
                     projectState?.ui?.activeModule === "geometria" &&
-                    ["point", "line", "polyline", "region"].includes(herramienta);
+                    [
+                        "point",
+                        "line",
+                        "polyline",
+                        "region",
+                        "region-insert",
+                        "region-remove"
+                    ].includes(herramienta);
 
                 if(
                     projectState?.ui?.activeModule === "geometria" &&
@@ -3472,6 +3697,10 @@
                     cancelarBorradorLinea();
                     cancelarBorradorPolilinea();
                     cancelarBorradorRegion();
+                    GeoFEMRegions.cancelarEdicionRegion(projectState);
+                    if(projectState?.ui){
+                        projectState.ui.activeTool = "select";
+                    }
                     GeoFEMSnap.limpiarCandidato(projectState);
                     GeoFEMGeometry.limpiarSeleccion(projectState);
                     renderizarViewportCad();

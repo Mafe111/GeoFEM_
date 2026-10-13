@@ -238,6 +238,27 @@
             return {ok: false, reason: "invalid_coordinate", punto};
         }
 
+        // Si el punto forma parte de una región cerrada, la edición no puede
+        // dejar el contorno con área cero ni con autointersecciones. La
+        // validación vive en cad-regions.js para mantener separadas las
+        // responsabilidades geométricas.
+        if (global.GeoFEMRegions?.validarMovimientoPunto) {
+            const validacion = global.GeoFEMRegions.validarMovimientoPunto(
+                state,
+                punto.id,
+                {x, y}
+            );
+            if (!validacion.ok) {
+                return {
+                    ok: false,
+                    reason: validacion.reason,
+                    punto,
+                    regionId: validacion.regionId || null,
+                    regionIds: validacion.regionIds || [],
+                };
+            }
+        }
+
         const cambio = punto.x !== x || punto.y !== y;
         punto.x = x;
         punto.y = y;

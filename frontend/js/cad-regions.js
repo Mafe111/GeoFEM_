@@ -1,7 +1,7 @@
 /*
  * GeoFEM - Regiones CAD cerradas
  * --------------------------------
- * Sprint 1 / Paso 9
+ * Sprint 1 / Paso 10
  *
  * Una región es una entidad topológica cerrada formada por una secuencia de
  * IDs de puntos existentes. El primer ID NO se repite al final.
@@ -201,6 +201,47 @@
         return total;
     }
 
+    function orientacionRegion(state, regionOId) {
+        const region = typeof regionOId === "object"
+            ? regionOId
+            : obtenerRegion(state, regionOId);
+        if (!region) return null;
+        const lista = puntosRegion(state, region);
+        if (lista.length !== region.pointIds.length || lista.length < 3) return null;
+        const areaFirmada = areaFirmadaDesdePuntos(lista);
+        if (Math.abs(areaFirmada) <= EPS) return "degenerada";
+        return areaFirmada > 0 ? "antihorario" : "horario";
+    }
+
+    function puntoConOverride(state, id, overrides = {}) {
+        const base = obtenerPunto(state, id);
+        if (!base) return null;
+        const override = overrides[String(id)] || overrides[id];
+        if (!override) return base;
+        const x = Number(override.x);
+        const y = Number(override.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return {...base, x, y};
+    }
+
+    function listaPuntosConOverride(state, pointIds = [], overrides = {}) {
+        return pointIds.map((id) => puntoConOverride(state, id, overrides));
+    }
+
+    function tienePosicionesDuplicadas(lista = []) {
+        for (let i = 0; i < lista.length; i += 1) {
+            for (let j = i + 1; j < lista.length; j += 1) {
+                if (
+                    Math.abs(lista[i].x - lista[j].x) <= EPS &&
+                    Math.abs(lista[i].y - lista[j].y) <= EPS
+                ) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     function orientacion(a, b, c) {
         const valor = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
         if (Math.abs(valor) <= EPS) return 0;
@@ -228,8 +269,7 @@
         return false;
     }
 
-    function tieneAutointersecciones(state, pointIds = []) {
-        const lista = pointIds.map((id) => obtenerPunto(state, id));
+    function tieneAutointerseccionesLista(lista = []) {
         if (lista.some((p) => !p) || lista.length < 4) return false;
         const n = lista.length;
 
@@ -250,6 +290,72 @@
             }
         }
         return false;
+    }
+
+    function tieneAutointersecciones(state, pointIds = []) {
+        const lista = pointIds.map((id) => obtenerPunto(state, id));
+        return tieneAutointerseccionesLista(lista);
+    }
+
+    function validarContorno(state, pointIds = [], overrides = {}) {
+        const ids = Array.isArray(pointIds) ? [...pointIds] : [];
+        if (ids.length < 3) {
+            return {ok: false, reason: "insufficient_vertices"};
+        }
+        if (new Set(ids.map(String)).size !== ids.length) {
+            return {ok: false, reason: "duplicate_vertex"};
+        }
+
+        const lista = listaPuntosConOverride(state, ids, overrides);
+        if (lista.some((p) => !p)) {
+            return {ok: false, reason: "point_not_found"};
+        }
+        if (tienePosicionesDuplicadas(lista)) {
+            return {ok: false, reason: "duplicate_position"};
+        }
+        if (tieneAutointerseccionesLista(lista)) {
+            return {ok: false, reason: "self_intersection"};
+        }
+        const area = Math.abs(areaFirmadaDesdePuntos(lista));
+        if (!(area > EPS)) {
+            return {ok: false, reason: "zero_area"};
+        }
+        return {ok: true, reason: null, area};
+    }
+
+    function validarMovimientoPunto(state, pointId, coordenada = {}) {
+        const x = Number(coordenada.x);
+        const y = Number(coordenada.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return {ok: false, reason: "invalid_coordinate", regionIds: []};
+        }
+
+        const afectadas = regiones(state).filter((region) =>
+            Array.isArray(region.pointIds) &&
+            region.pointIds.some((id) => String(id) === String(pointId))
+        );
+
+        for (const region of afectadas) {
+            const validacion = validarContorno(
+                state,
+                region.pointIds,
+                {[String(pointId)]: {x, y}}
+            );
+            if (!validacion.ok) {
+                return {
+                    ok: false,
+                    reason: validacion.reason,
+                    regionId: region.id,
+                    regionIds: afectadas.map((item) => item.id),
+                };
+            }
+        }
+
+        return {
+            ok: true,
+            reason: null,
+            regionIds: afectadas.map((item) => item.id),
+        };
     }
 
     function secuenciaCerradaEquivalente(a = [], b = []) {
@@ -290,17 +396,9 @@
         if (new Set(ids.map(String)).size !== ids.length) {
             return {ok: false, reason: "duplicate_vertex", region: null};
         }
-        if (ids.some((id) => !obtenerPunto(state, id))) {
-            return {ok: false, reason: "point_not_found", region: null};
-        }
-        if (tieneAutointersecciones(state, ids)) {
-            return {ok: false, reason: "self_intersection", region: null};
-        }
-
-        const lista = ids.map((id) => obtenerPunto(state, id));
-        const area = Math.abs(areaFirmadaDesdePuntos(lista));
-        if (!(area > EPS)) {
-            return {ok: false, reason: "zero_area", region: null};
+        const validacion = validarContorno(state, ids);
+        if (!validacion.ok) {
+            return {ok: false, reason: validacion.reason, region: null};
         }
         if (existeRegionEquivalente(state, ids)) {
             return {ok: false, reason: "duplicate", region: null};
@@ -341,6 +439,183 @@
         const region = regionSeleccionada(state);
         if (!region) return {ok: false, reason: "no_selection", region: null};
         return eliminarRegion(state, region.id);
+    }
+
+    function regionObjetivoEdicion(state) {
+        const id = state?.ui?.regionEditTargetId;
+        return id ? obtenerRegion(state, id) : regionSeleccionada(state);
+    }
+
+    function iniciarEdicionRegion(state, regionId) {
+        const region = obtenerRegion(state, regionId);
+        if (!region || !state?.ui) {
+            return {ok: false, reason: "not_found", region: null};
+        }
+        state.ui.regionEditTargetId = region.id;
+        seleccionarRegion(state, region.id);
+        return {ok: true, reason: null, region};
+    }
+
+    function cancelarEdicionRegion(state) {
+        if (state?.ui) state.ui.regionEditTargetId = null;
+    }
+
+    function quitarVerticeRegion(state, regionId, pointId) {
+        const region = obtenerRegion(state, regionId);
+        if (!region) return {ok: false, reason: "not_found", region: null};
+        if (!region.pointIds.some((id) => String(id) === String(pointId))) {
+            return {ok: false, reason: "point_not_in_region", region};
+        }
+        if (region.pointIds.length <= 3) {
+            return {ok: false, reason: "minimum_vertices", region};
+        }
+
+        const nuevosIds = region.pointIds.filter(
+            (id) => String(id) !== String(pointId)
+        );
+        const validacion = validarContorno(state, nuevosIds);
+        if (!validacion.ok) {
+            return {ok: false, reason: validacion.reason, region};
+        }
+
+        region.pointIds = nuevosIds;
+        seleccionarRegion(state, region.id);
+        cancelarEdicionRegion(state);
+        marcarModificado(state);
+        return {
+            ok: true,
+            reason: null,
+            region,
+            pointId,
+            pointKept: true,
+        };
+    }
+
+    function invertirRegion(state, regionId) {
+        const region = obtenerRegion(state, regionId);
+        if (!region) return {ok: false, reason: "not_found", region: null};
+        region.pointIds = [...region.pointIds].reverse();
+        seleccionarRegion(state, region.id);
+        marcarModificado(state);
+        return {ok: true, reason: null, region};
+    }
+
+    function proyeccionSegmento(a, b, p) {
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const longitud2 = dx * dx + dy * dy;
+        if (longitud2 <= EPS) {
+            return {x: a.x, y: a.y, t: 0, distance: Math.hypot(p.x - a.x, p.y - a.y)};
+        }
+        const tLibre = ((p.x - a.x) * dx + (p.y - a.y) * dy) / longitud2;
+        const t = Math.max(0, Math.min(1, tLibre));
+        const x = a.x + t * dx;
+        const y = a.y + t * dy;
+        return {x, y, t, distance: Math.hypot(p.x - x, p.y - y)};
+    }
+
+    function bordeMasCercano(state, regionOId, viewport, svgPoint, tolerancePx = 14) {
+        const region = typeof regionOId === "object"
+            ? regionOId
+            : obtenerRegion(state, regionOId);
+        if (!region || !svgPoint || !global.GeoFEMViewport) return null;
+        const verticesModelo = puntosRegion(state, region);
+        if (verticesModelo.length !== region.pointIds.length) return null;
+
+        let mejor = null;
+        for (let i = 0; i < verticesModelo.length; i += 1) {
+            const aModelo = verticesModelo[i];
+            const bModelo = verticesModelo[(i + 1) % verticesModelo.length];
+            const a = global.GeoFEMViewport.modelToScreen(aModelo, viewport);
+            const b = global.GeoFEMViewport.modelToScreen(bModelo, viewport);
+            const proy = proyeccionSegmento(a, b, svgPoint);
+            if (!mejor || proy.distance < mejor.distancePx) {
+                mejor = {
+                    edgeIndex: i,
+                    startPointId: region.pointIds[i],
+                    endPointId: region.pointIds[(i + 1) % region.pointIds.length],
+                    t: proy.t,
+                    distancePx: proy.distance,
+                    model: {
+                        x: aModelo.x + proy.t * (bModelo.x - aModelo.x),
+                        y: aModelo.y + proy.t * (bModelo.y - aModelo.y),
+                    },
+                };
+            }
+        }
+
+        return mejor && mejor.distancePx <= Number(tolerancePx) ? mejor : null;
+    }
+
+    function puntoCoincidente(state, coordenada, excludeIds = []) {
+        const excluidos = new Set(excludeIds.map(String));
+        return puntos(state).find((punto) =>
+            !excluidos.has(String(punto.id)) &&
+            Math.abs(punto.x - coordenada.x) <= EPS &&
+            Math.abs(punto.y - coordenada.y) <= EPS
+        ) || null;
+    }
+
+    function insertarVerticeEnBorde(
+        state,
+        regionId,
+        viewport,
+        svgPoint,
+        tolerancePx = 14
+    ) {
+        const region = obtenerRegion(state, regionId);
+        if (!region) return {ok: false, reason: "not_found", region: null};
+
+        const borde = bordeMasCercano(
+            state,
+            region,
+            viewport,
+            svgPoint,
+            tolerancePx
+        );
+        if (!borde) return {ok: false, reason: "edge_not_found", region};
+
+        // Evitamos insertar prácticamente encima de un extremo: no aporta un
+        // vértice nuevo y puede crear segmentos numéricamente degenerados.
+        if (borde.t <= 0.02 || borde.t >= 0.98) {
+            return {ok: false, reason: "near_endpoint", region, borde};
+        }
+
+        let punto = puntoCoincidente(
+            state,
+            borde.model,
+            [borde.startPointId, borde.endPointId]
+        );
+        let creado = false;
+
+        if (!punto) {
+            if (!global.GeoFEMGeometry?.crearPunto) {
+                return {ok: false, reason: "geometry_api_missing", region};
+            }
+            punto = global.GeoFEMGeometry.crearPunto(state, borde.model);
+            creado = true;
+        }
+
+        if (region.pointIds.some((id) => String(id) === String(punto.id))) {
+            return {ok: false, reason: "duplicate_vertex", region, borde};
+        }
+
+        const nuevosIds = [...region.pointIds];
+        nuevosIds.splice(borde.edgeIndex + 1, 0, punto.id);
+        const validacion = validarContorno(state, nuevosIds);
+        if (!validacion.ok) {
+            if (creado && global.GeoFEMGeometry?.eliminarPunto) {
+                global.GeoFEMGeometry.eliminarPunto(state, punto.id, {force: true});
+            }
+            seleccionarRegion(state, region.id);
+            return {ok: false, reason: validacion.reason, region, borde};
+        }
+
+        region.pointIds = nuevosIds;
+        seleccionarRegion(state, region.id);
+        cancelarEdicionRegion(state);
+        marcarModificado(state);
+        return {ok: true, reason: null, region, punto, borde, createdPoint: creado};
     }
 
     function crearElementoSvg(nombre, atributos = {}) {
@@ -502,6 +777,16 @@
         tieneAutointersecciones,
         areaRegion,
         perimetroRegion,
+        orientacionRegion,
+        validarContorno,
+        validarMovimientoPunto,
+        bordeMasCercano,
+        iniciarEdicionRegion,
+        cancelarEdicionRegion,
+        regionObjetivoEdicion,
+        insertarVerticeEnBorde,
+        quitarVerticeRegion,
+        invertirRegion,
         eliminarRegion,
         eliminarRegionSeleccionada,
         renderRegions,

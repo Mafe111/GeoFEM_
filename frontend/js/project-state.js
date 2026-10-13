@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.5.0";
+    const STATE_SCHEMA_VERSION = "1.6.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -145,6 +145,11 @@
                 // topológica implícita de la entidad Region.
                 regionDraftPointIds: [],
                 regionDraftCursorModel: null,
+
+                // Edición topológica de regiones. Mientras una herramienta de
+                // edición está activa conservamos explícitamente el ID de la
+                // región objetivo para no depender de la selección visual.
+                regionEditTargetId: null,
 
                 // Candidato temporal de snap bajo el cursor. Es estado de UI,
                 // no geometría persistente y nunca debe marcar dirty.
