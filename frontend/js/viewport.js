@@ -116,6 +116,207 @@
         };
     }
 
+
+    function limitar(valor, minimo, maximo) {
+        return Math.min(Math.max(valor, minimo), maximo);
+    }
+
+    function limitesZoom(viewport = {}) {
+        const minimo = Math.max(numeroFinito(viewport?.minZoom, 0.20), 0.01);
+        const maximo = Math.max(numeroFinito(viewport?.maxZoom, 8.0), minimo);
+
+        return {minimo, maximo};
+    }
+
+    /*
+     * Cambia el zoom conservando inmóvil el punto del modelo que está debajo
+     * del cursor. Es el comportamiento esperado en un CAD: la rueda acerca o
+     * aleja exactamente la zona que el usuario está observando.
+     */
+    function setZoomAtSvgPoint(viewport, nuevoZoom, puntoAnclaSvg) {
+        if (!viewport) {
+            throw new Error("Se requiere un viewport válido para modificar el zoom.");
+        }
+
+        const ancla = {
+            x: numeroFinito(puntoAnclaSvg?.x, 0),
+            y: numeroFinito(puntoAnclaSvg?.y, 0),
+        };
+        const modeloBajoCursor = screenToModel(ancla, viewport);
+        const {minimo, maximo} = limitesZoom(viewport);
+
+        viewport.zoom = limitar(numeroFinito(nuevoZoom, 1), minimo, maximo);
+
+        const pantallaDespues = modelToScreen(modeloBajoCursor, viewport);
+        viewport.pan.x += ancla.x - pantallaDespues.x;
+        viewport.pan.y += ancla.y - pantallaDespues.y;
+
+        return viewport.zoom;
+    }
+
+    function zoomByFactorAtSvgPoint(viewport, factor, puntoAnclaSvg) {
+        const factorSeguro = Math.max(numeroFinito(factor, 1), 0.01);
+        const zoomActual = numeroFinito(viewport?.zoom, 1);
+
+        return setZoomAtSvgPoint(
+            viewport,
+            zoomActual * factorSeguro,
+            puntoAnclaSvg
+        );
+    }
+
+    function panBySvgDelta(viewport, deltaX, deltaY) {
+        if (!viewport) {
+            throw new Error("Se requiere un viewport válido para desplazar la vista.");
+        }
+
+        viewport.pan.x += numeroFinito(deltaX, 0);
+        viewport.pan.y += numeroFinito(deltaY, 0);
+
+        return {...viewport.pan};
+    }
+
+    function resetView(viewport) {
+        if (!viewport) {
+            return;
+        }
+
+        viewport.zoom = 1.0;
+        viewport.pan.x = 0;
+        viewport.pan.y = 0;
+    }
+
+    function visibleModelBounds(viewport = {}) {
+        const viewBox = viewport?.viewBox || {};
+        const x0 = numeroFinito(viewBox.x, 0);
+        const y0 = numeroFinito(viewBox.y, 0);
+        const x1 = x0 + numeroFinito(viewBox.width, 1200);
+        const y1 = y0 + numeroFinito(viewBox.height, 800);
+
+        const a = screenToModel({x: x0, y: y0}, viewport);
+        const b = screenToModel({x: x1, y: y1}, viewport);
+
+        return {
+            minX: Math.min(a.x, b.x),
+            maxX: Math.max(a.x, b.x),
+            minY: Math.min(a.y, b.y),
+            maxY: Math.max(a.y, b.y),
+        };
+    }
+
+    // Redondea un paso arbitrario a la serie 1-2-5 × 10^n. Esta serie es
+    // habitual en ejes, mapas y CAD porque produce escalas fáciles de leer.
+    function niceStep(valor) {
+        const positivo = Math.max(Math.abs(numeroFinito(valor, 1)), 1e-12);
+        const potencia = Math.pow(10, Math.floor(Math.log10(positivo)));
+        const normalizado = positivo / potencia;
+
+        let factor;
+        if (normalizado <= 1) {
+            factor = 1;
+        } else if (normalizado <= 2) {
+            factor = 2;
+        } else if (normalizado <= 5) {
+            factor = 5;
+        } else {
+            factor = 10;
+        }
+
+        return factor * potencia;
+    }
+
+    function gridSpacingModel(viewport = {}) {
+        const grid = viewport?.grid || {};
+
+        if (grid.dynamic === false) {
+            return Math.max(numeroFinito(grid.spacingModel, 1), 1e-9);
+        }
+
+        const objetivoSvg = Math.max(numeroFinito(grid.targetMinorSvg, 32), 8);
+        const pasoIdealModelo = objetivoSvg / escalaEfectiva(viewport);
+
+        return niceStep(pasoIdealModelo);
+    }
+
+    function renderGrid(layer, viewport = {}) {
+        if (!layer || typeof document === "undefined") {
+            return null;
+        }
+
+        layer.replaceChildren();
+
+        if (viewport?.grid?.enabled === false) {
+            return null;
+        }
+
+        const paso = gridSpacingModel(viewport);
+        const majorEvery = Math.max(1, Math.round(numeroFinito(viewport?.grid?.majorEvery, 5)));
+        const bounds = visibleModelBounds(viewport);
+        const epsilon = paso * 1e-8;
+
+        let dMenor = "";
+        let dMayor = "";
+
+        const indiceX0 = Math.floor((bounds.minX + epsilon) / paso);
+        const indiceX1 = Math.ceil((bounds.maxX - epsilon) / paso);
+        const indiceY0 = Math.floor((bounds.minY + epsilon) / paso);
+        const indiceY1 = Math.ceil((bounds.maxY - epsilon) / paso);
+
+        for (let i = indiceX0; i <= indiceX1; i += 1) {
+            const xModelo = i * paso;
+            const p1 = modelToScreen({x: xModelo, y: bounds.minY}, viewport);
+            const p2 = modelToScreen({x: xModelo, y: bounds.maxY}, viewport);
+            const segmento = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y} `;
+
+            if (Math.abs(i) % majorEvery === 0) {
+                dMayor += segmento;
+            } else {
+                dMenor += segmento;
+            }
+        }
+
+        for (let j = indiceY0; j <= indiceY1; j += 1) {
+            const yModelo = j * paso;
+            const p1 = modelToScreen({x: bounds.minX, y: yModelo}, viewport);
+            const p2 = modelToScreen({x: bounds.maxX, y: yModelo}, viewport);
+            const segmento = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y} `;
+
+            if (Math.abs(j) % majorEvery === 0) {
+                dMayor += segmento;
+            } else {
+                dMenor += segmento;
+            }
+        }
+
+        if (dMenor) {
+            layer.appendChild(
+                crearElementoSvg("path", {
+                    d: dMenor.trim(),
+                    fill: "none",
+                    stroke: "#edf2f7",
+                    "stroke-width": 1,
+                    "vector-effect": "non-scaling-stroke",
+                    "pointer-events": "none",
+                })
+            );
+        }
+
+        if (dMayor) {
+            layer.appendChild(
+                crearElementoSvg("path", {
+                    d: dMayor.trim(),
+                    fill: "none",
+                    stroke: "#dbe4ee",
+                    "stroke-width": 1.25,
+                    "vector-effect": "non-scaling-stroke",
+                    "pointer-events": "none",
+                })
+            );
+        }
+
+        return paso;
+    }
+
     function crearElementoSvg(nombre, atributos = {}) {
         const elemento = document.createElementNS(SVG_NS, nombre);
 
@@ -224,6 +425,13 @@
         screenToModel,
         clientToSvg,
         eventToModel,
+        setZoomAtSvgPoint,
+        zoomByFactorAtSvgPoint,
+        panBySvgDelta,
+        resetView,
+        visibleModelBounds,
+        gridSpacingModel,
+        renderGrid,
         renderReferenceAxes,
         roundTripError,
     };

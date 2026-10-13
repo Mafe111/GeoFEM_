@@ -97,12 +97,18 @@
                 },
                 baseScale: 20.0, // unidades SVG por metro a zoom = 1
                 zoom: 1.0,
+                minZoom: 0.20,
+                maxZoom: 8.0,
                 pan: {
                     x: 0,
                     y: 0,
                 },
                 grid: {
                     enabled: true,
+                    dynamic: true,
+                    // El Paso 3 calcula automáticamente un espaciado legible
+                    // intentando mantener ~32 unidades SVG entre líneas menores.
+                    targetMinorSvg: 32,
                     spacingModel: 1.0,
                     majorEvery: 5,
                 },

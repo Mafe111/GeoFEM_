@@ -800,6 +800,8 @@
     border-left:1px solid #dbe4ee;
 
     padding:18px;
+    overflow-y:auto;
+    min-height:0;
 
 }
 
@@ -835,7 +837,14 @@
 
     width:100%;
     height:100%;
+    cursor:crosshair;
+    touch-action:none;
+    user-select:none;
 
+}
+
+#cadSvg.is-panning{
+    cursor:grabbing;
 }
 
 /* Capas del viewport CAD. En este Sprint son una estructura vacía
@@ -863,6 +872,31 @@
 .coordinate-value{
     font-family:Consolas, "Courier New", monospace;
     font-variant-numeric:tabular-nums;
+}
+
+.viewport-reset-btn{
+    width:100%;
+    margin-top:8px;
+    border:1px solid #cbd5e1;
+    border-radius:10px;
+    padding:8px 10px;
+    background:white;
+    color:#334155;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.viewport-reset-btn:hover{
+    border-color:#56bca2;
+    background:#f0fdfa;
+    color:#0f766e;
+}
+
+.viewport-hint{
+    margin-top:10px;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.45;
 }
 
 #coordinateReferenceLayer{
@@ -1373,35 +1407,16 @@
                 aria-label="Viewport CAD de GeoFEM"
             >
 
-                <defs>
-
-                    <pattern
-                        id="grid"
-                        width="25"
-                        height="25"
-                        patternUnits="userSpaceOnUse"
-                    >
-
-                        <path
-                            d="M 25 0 L 0 0 0 25"
-                            fill="none"
-                            stroke="#e2e8f0"
-                            stroke-width="1"
-                        />
-
-                    </pattern>
-
-                </defs>
-
-                <!-- Fondo del viewport. En el Paso 3 el grid será dinámico. -->
+                <!-- Fondo blanco y grid dinámico generado desde viewport.js. -->
                 <rect
-                    id="cadGridBackground"
+                    id="cadBackground"
                     x="0"
                     y="0"
                     width="1200"
                     height="800"
-                    fill="url(#grid)"
+                    fill="#ffffff"
                 />
+                <g id="gridLayer" pointer-events="none"></g>
 
                 <!--
                     CONTENIDO DEL MODELO
@@ -1538,6 +1553,33 @@
                 <span>positiva hacia arriba</span>
             </p>
 
+            <p>
+                Zoom:
+                <span id="propZoomViewport" class="coordinate-value">100%</span>
+            </p>
+
+            <p>
+                Grid menor:
+                <span id="propGridViewport" class="coordinate-value">1.00 m</span>
+            </p>
+
+            <p>
+                Pan SVG:
+                <span id="propPanViewport" class="coordinate-value">(0.0, 0.0)</span>
+            </p>
+
+            <button
+                class="viewport-reset-btn"
+                type="button"
+                onclick="restablecerVistaCad()"
+            >
+                ↺ Restablecer vista
+            </button>
+
+            <div class="viewport-hint">
+                Rueda: zoom · Botón central o Shift + arrastrar: pan
+            </div>
+
         </div>
 
     </div>
@@ -1584,6 +1626,13 @@
         X <span id="txt-cursor-x" class="coordinate-value">--</span> m
         ·
         Y <span id="txt-cursor-y" class="coordinate-value">--</span> m
+
+    </div>
+
+    <div>
+
+        Zoom:
+        <span id="txt-zoom" class="coordinate-value">100%</span>
 
     </div>
 
@@ -1932,6 +1981,18 @@
             document.getElementById("propOrigenViewport").textContent =
                 `(${viewport.originSvg.x}, ${viewport.originSvg.y})`;
 
+            const zoomPorcentaje = `${(viewport.zoom * 100).toFixed(0)}%`;
+            const pasoGrid = GeoFEMViewport.gridSpacingModel(viewport);
+
+            document.getElementById("propZoomViewport").textContent =
+                zoomPorcentaje;
+            document.getElementById("propGridViewport").textContent =
+                `${pasoGrid.toFixed(2)} ${projectState.units.longitud}`;
+            document.getElementById("propPanViewport").textContent =
+                `(${viewport.pan.x.toFixed(1)}, ${viewport.pan.y.toFixed(1)})`;
+            document.getElementById("txt-zoom").textContent =
+                zoomPorcentaje;
+
         }
 
         function actualizarEstadoVacioCad(){
@@ -1950,24 +2011,34 @@
 
         }
 
+        function renderizarViewportCad(){
+
+            GeoFEMViewport.renderGrid(
+                document.getElementById("gridLayer"),
+                projectState.viewport
+            );
+
+            GeoFEMViewport.renderReferenceAxes(
+                document.getElementById("coordinateReferenceLayer"),
+                projectState.viewport
+            );
+
+            actualizarPanelDesdeProjectState();
+
+        }
+
         function renderizarProjectState(){
 
-            // Sprint 1 / Paso 1:
-            // todavía no dibujamos entidades. Preparamos y limpiamos las capas
-            // para garantizar que el SVG sea una representación del estado.
+            // Las entidades del modelo siguen vacías en este paso. Zoom, pan y
+            // grid modifican solamente la cámara; nunca alteran la geometría.
             limpiarCapaSvg("geometryLayer");
             limpiarCapaSvg("meshLayer");
             limpiarCapaSvg("boundaryLayer");
             limpiarCapaSvg("resultLayer");
             limpiarCapaSvg("selectionLayer");
 
-            actualizarPanelDesdeProjectState();
             actualizarEstadoVacioCad();
-
-            GeoFEMViewport.renderReferenceAxes(
-                document.getElementById("coordinateReferenceLayer"),
-                projectState.viewport
-            );
+            renderizarViewportCad();
 
             console.log(
                 "[GeoFEM] projectState renderizado:",
@@ -1992,12 +2063,16 @@
 
         }
 
-        function configurarLecturaCoordenadasCad(){
+        function configurarInteraccionViewportCad(){
 
             const svg = document.getElementById("cadSvg");
+            const estadoPan = {
+                activo: false,
+                pointerId: null,
+                ultimoSvg: null,
+            };
 
-            svg.addEventListener("pointermove", (evento) => {
-
+            function actualizarCursorDesdeEvento(evento){
                 const conversion = GeoFEMViewport.eventToModel(
                     svg,
                     evento,
@@ -2005,11 +2080,97 @@
                 );
 
                 actualizarLecturaCursor(conversion.model);
+                return conversion;
+            }
 
+            svg.addEventListener("wheel", (evento) => {
+                evento.preventDefault();
+
+                const anclaSvg = GeoFEMViewport.clientToSvg(
+                    svg,
+                    evento.clientX,
+                    evento.clientY
+                );
+                const factor = evento.deltaY < 0 ? 1.15 : (1 / 1.15);
+
+                GeoFEMViewport.zoomByFactorAtSvgPoint(
+                    projectState.viewport,
+                    factor,
+                    anclaSvg
+                );
+
+                renderizarViewportCad();
+                actualizarCursorDesdeEvento(evento);
+            }, {passive:false});
+
+            svg.addEventListener("pointerdown", (evento) => {
+                const botonCentral = evento.button === 1;
+                const shiftIzquierdo = evento.button === 0 && evento.shiftKey;
+
+                if(!botonCentral && !shiftIzquierdo){
+                    return;
+                }
+
+                evento.preventDefault();
+                estadoPan.activo = true;
+                estadoPan.pointerId = evento.pointerId;
+                estadoPan.ultimoSvg = GeoFEMViewport.clientToSvg(
+                    svg,
+                    evento.clientX,
+                    evento.clientY
+                );
+
+                svg.setPointerCapture(evento.pointerId);
+                svg.classList.add("is-panning");
             });
 
+            svg.addEventListener("pointermove", (evento) => {
+                if(estadoPan.activo && evento.pointerId === estadoPan.pointerId){
+                    const actualSvg = GeoFEMViewport.clientToSvg(
+                        svg,
+                        evento.clientX,
+                        evento.clientY
+                    );
+
+                    GeoFEMViewport.panBySvgDelta(
+                        projectState.viewport,
+                        actualSvg.x - estadoPan.ultimoSvg.x,
+                        actualSvg.y - estadoPan.ultimoSvg.y
+                    );
+
+                    estadoPan.ultimoSvg = actualSvg;
+                    renderizarViewportCad();
+                }
+
+                actualizarCursorDesdeEvento(evento);
+            });
+
+            function finalizarPan(evento){
+                if(!estadoPan.activo){
+                    return;
+                }
+
+                if(
+                    evento &&
+                    estadoPan.pointerId !== null &&
+                    svg.hasPointerCapture(estadoPan.pointerId)
+                ){
+                    svg.releasePointerCapture(estadoPan.pointerId);
+                }
+
+                estadoPan.activo = false;
+                estadoPan.pointerId = null;
+                estadoPan.ultimoSvg = null;
+                svg.classList.remove("is-panning");
+            }
+
+            svg.addEventListener("pointerup", finalizarPan);
+            svg.addEventListener("pointercancel", finalizarPan);
+
             svg.addEventListener("pointerleave", () => {
-                actualizarLecturaCursor(null);
+                if(!estadoPan.activo){
+                    actualizarLecturaCursor(null);
+                }
             });
 
             // Prueba numérica de ida y vuelta. Si las transformaciones son
@@ -2023,7 +2184,13 @@
 
         }
 
-        configurarLecturaCoordenadasCad();
+        function restablecerVistaCad(){
+            GeoFEMViewport.resetView(projectState.viewport);
+            renderizarViewportCad();
+            actualizarLecturaCursor(null);
+        }
+
+        configurarInteraccionViewportCad();
 
         function activarProyecto(proyecto){
 
