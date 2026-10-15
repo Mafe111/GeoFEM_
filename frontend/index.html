@@ -881,6 +881,133 @@
     cursor:crosshair;
 }
 
+.strata-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-top:10px;
+}
+
+.strata-empty{
+    padding:10px 11px;
+    border:1px dashed #cbd5e1;
+    border-radius:10px;
+    color:#64748b;
+    font-size:12px;
+    line-height:1.45;
+    background:#f8fafc;
+}
+
+.stratum-tool-meta{
+    display:block;
+    margin-top:3px;
+    font-size:10px;
+    font-weight:600;
+    color:#64748b;
+}
+
+.stratum-editor-field{
+    margin-top:10px;
+}
+
+.stratum-editor-field label{
+    display:block;
+    margin-bottom:5px;
+    color:#475569;
+    font-size:12px;
+    font-weight:700;
+}
+
+.stratum-editor-field input[type="text"]{
+    width:100%;
+    box-sizing:border-box;
+    border:1px solid #cbd5e1;
+    border-radius:9px;
+    padding:8px 9px;
+    background:#ffffff;
+    color:#0f172a;
+}
+
+.stratum-color-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:10px;
+    font-size:12px;
+    color:#475569;
+}
+
+.stratum-color-row input[type="color"]{
+    width:42px;
+    height:30px;
+    padding:2px;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    background:white;
+    cursor:pointer;
+}
+
+.stratum-color-editor{
+    margin-top:8px;
+    padding:9px;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+    background:#f8fafc;
+}
+
+.stratum-color-editor-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.stratum-color-hex{
+    width:92px;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    padding:7px 8px;
+    background:white;
+    color:#0f172a;
+    font-family:Consolas, "Courier New", monospace;
+    text-transform:uppercase;
+}
+
+.stratum-color-preview{
+    width:30px;
+    height:30px;
+    border:1px solid #94a3b8;
+    border-radius:8px;
+    background:#99d8c9;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);
+}
+
+.stratum-color-palette{
+    display:grid;
+    grid-template-columns:repeat(8, 1fr);
+    gap:5px;
+    margin-top:8px;
+}
+
+.stratum-color-swatch{
+    height:24px;
+    border:1px solid rgba(15,23,42,.22);
+    border-radius:7px;
+    cursor:pointer;
+    padding:0;
+}
+
+.stratum-color-swatch:hover{
+    outline:2px solid #14b8a6;
+    outline-offset:1px;
+}
+
+.stratum-color-help{
+    margin-top:6px;
+    font-size:10.5px;
+    line-height:1.35;
+    color:#64748b;
+}
+
 /* Capas del viewport CAD. En este Sprint son una estructura vacía
    preparada para geometría, malla, restricciones y resultados. */
 #viewportContent > g{
@@ -1488,6 +1615,10 @@
         Geometría
     </button>
 
+    <button onclick="cambiarModulo('estratos',this)">
+        Estratos
+    </button>
+
     <button onclick="cambiarModulo('malla',this)">
         Malla
     </button>
@@ -1644,6 +1775,7 @@
                 -->
                 <g id="viewportContent">
                     <g id="regionLayer"></g>
+                    <g id="strataLayer"></g>
                     <g id="geometryLayer"></g>
                     <g id="meshLayer"></g>
                     <g id="boundaryLayer"></g>
@@ -1750,6 +1882,11 @@
             <p>
                 Regiones:
                 <span id="propRegiones">0</span>
+            </p>
+
+            <p>
+                Estratos:
+                <span id="propEstratos">0</span>
             </p>
 
             <p>
@@ -1940,6 +2077,106 @@
 
                 <div class="selection-hint">
                     La región está cerrada de forma implícita. Puedes insertar o quitar vértices sin borrar los puntos independientes. Una edición que genere área cero o autointersecciones será rechazada.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="property-card">
+
+            <h4>Estrato seleccionado</h4>
+
+            <div id="propStratumEmpty">
+                <p>Sin estrato seleccionado.</p>
+                <p style="font-size:12px; color:#64748b; line-height:1.45;">
+                    Selecciona una región en Geometría, abre Estratos y crea su entidad geotécnica.
+                </p>
+            </div>
+
+            <div id="propStratumDetail" style="display:none;">
+                <p>
+                    ID: <span id="propSelectedStratumId" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Región: <span id="propSelectedStratumRegion" class="coordinate-value">--</span>
+                </p>
+                <p>
+                    Área geométrica: <span id="propSelectedStratumArea" class="coordinate-value">--</span> m²
+                </p>
+                <p>
+                    Material: <span id="propSelectedStratumMaterial">Sin asignar</span>
+                </p>
+
+                <div class="stratum-editor-field">
+                    <label for="inputSelectedStratumName">Nombre del estrato</label>
+                    <input
+                        id="inputSelectedStratumName"
+                        type="text"
+                        maxlength="80"
+                        onkeydown="if(event.key==='Enter'){actualizarEstratoSeleccionadoDesdePanel();}"
+                    />
+                </div>
+
+                <div class="stratum-color-editor">
+                    <div class="stratum-color-row" style="margin-top:0;">
+                        <span>Color de visualización</span>
+                        <input
+                            id="inputSelectedStratumColor"
+                            type="color"
+                            oninput="sincronizarColorEstratoDesdePicker(this.value)"
+                            onchange="sincronizarColorEstratoDesdePicker(this.value)"
+                            title="Selector de color"
+                        />
+                        <input
+                            id="inputSelectedStratumColorHex"
+                            class="stratum-color-hex"
+                            type="text"
+                            maxlength="7"
+                            value="#99D8C9"
+                            oninput="sincronizarColorEstratoDesdeHex(this.value)"
+                            onkeydown="if(event.key==='Enter'){actualizarEstratoSeleccionadoDesdePanel();}"
+                            aria-label="Color hexadecimal del estrato"
+                        />
+                        <span
+                            id="selectedStratumColorPreview"
+                            class="stratum-color-preview"
+                            title="Vista previa del color"
+                        ></span>
+                    </div>
+
+                    <div class="stratum-color-palette" aria-label="Paleta rápida de colores">
+                        <button class="stratum-color-swatch" style="background:#99d8c9;" onclick="seleccionarColorEstratoDesdePaleta('#99d8c9')" title="#99D8C9"></button>
+                        <button class="stratum-color-swatch" style="background:#bcbddc;" onclick="seleccionarColorEstratoDesdePaleta('#bcbddc')" title="#BCBDDC"></button>
+                        <button class="stratum-color-swatch" style="background:#fdd0a2;" onclick="seleccionarColorEstratoDesdePaleta('#fdd0a2')" title="#FDD0A2"></button>
+                        <button class="stratum-color-swatch" style="background:#a6bddb;" onclick="seleccionarColorEstratoDesdePaleta('#a6bddb')" title="#A6BDDB"></button>
+                        <button class="stratum-color-swatch" style="background:#c7e9c0;" onclick="seleccionarColorEstratoDesdePaleta('#c7e9c0')" title="#C7E9C0"></button>
+                        <button class="stratum-color-swatch" style="background:#fdae6b;" onclick="seleccionarColorEstratoDesdePaleta('#fdae6b')" title="#FDAE6B"></button>
+                        <button class="stratum-color-swatch" style="background:#9ecae1;" onclick="seleccionarColorEstratoDesdePaleta('#9ecae1')" title="#9ECAE1"></button>
+                        <button class="stratum-color-swatch" style="background:#dadaeb;" onclick="seleccionarColorEstratoDesdePaleta('#dadaeb')" title="#DADAEB"></button>
+                    </div>
+
+                    <div class="stratum-color-help">
+                        Puedes usar la paleta, el selector o escribir un color hexadecimal. El cambio se guarda al pulsar “Guardar estrato”.
+                    </div>
+                </div>
+
+                <div class="property-action-row">
+                    <button
+                        class="property-action-btn"
+                        onclick="actualizarEstratoSeleccionadoDesdePanel()"
+                    >
+                        Guardar estrato
+                    </button>
+                    <button
+                        class="property-action-btn danger"
+                        onclick="eliminarEstratoSeleccionadoCad()"
+                    >
+                        Eliminar estrato
+                    </button>
+                </div>
+
+                <div class="selection-hint">
+                    El estrato referencia una región; no copia sus coordenadas. El material se asignará en el siguiente paso del Sprint 2.
                 </div>
             </div>
 
@@ -2145,6 +2382,7 @@
     <script src="js/viewport.js"></script>
     <script src="js/cad-geometry.js"></script>
     <script src="js/cad-regions.js"></script>
+    <script src="js/cad-strata.js"></script>
     <script src="js/cad-snap.js"></script>
 
     <script>
@@ -2458,6 +2696,8 @@
                 resumen.geometry.polylines;
             document.getElementById("propRegiones").textContent =
                 resumen.geometry.regions;
+            document.getElementById("propEstratos").textContent =
+                resumen.strata;
             document.getElementById("propMateriales").textContent =
                 resumen.materials;
 
@@ -2598,6 +2838,32 @@
                 vacioSeleccion.style.display = "block";
             }
 
+            const estratoSeleccionado = GeoFEMStrata.estratoSeleccionado(projectState);
+            const estratoVacio = document.getElementById("propStratumEmpty");
+            const estratoDetalle = document.getElementById("propStratumDetail");
+            estratoVacio.style.display = estratoSeleccionado ? "none" : "block";
+            estratoDetalle.style.display = estratoSeleccionado ? "block" : "none";
+
+            if(estratoSeleccionado){
+                document.getElementById("propSelectedStratumId").textContent =
+                    estratoSeleccionado.id;
+                document.getElementById("propSelectedStratumRegion").textContent =
+                    estratoSeleccionado.regionId;
+                const areaEstrato = GeoFEMStrata.areaEstrato(
+                    projectState,
+                    estratoSeleccionado
+                );
+                document.getElementById("propSelectedStratumArea").textContent =
+                    areaEstrato === null ? "--" : areaEstrato.toFixed(3);
+                document.getElementById("propSelectedStratumMaterial").textContent =
+                    estratoSeleccionado.materialId || "Sin asignar";
+                document.getElementById("inputSelectedStratumName").value =
+                    estratoSeleccionado.nombre;
+                cargarColorEstratoEnEditor(
+                    estratoSeleccionado.displayColor || "#99d8c9"
+                );
+            }
+
         }
 
         function actualizarEstadoVacioCad(){
@@ -2627,6 +2893,14 @@
             // Su relleno es visual; la fuente de verdad siguen siendo pointIds.
             GeoFEMRegions.renderRegions(
                 document.getElementById("regionLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            // Los estratos son una capa semántica derivada de regiones. Se
+            // renderizan sin apropiarse de la geometría ni duplicar coordenadas.
+            GeoFEMStrata.renderStrata(
+                document.getElementById("strataLayer"),
                 projectState,
                 projectState.viewport
             );
@@ -3050,6 +3324,19 @@
         function eliminarRegionSeleccionadaCad(){
             const region = GeoFEMRegions.regionSeleccionada(projectState);
             if(!region){
+                return;
+            }
+
+            const estratoRelacionado = GeoFEMStrata.buscarPorRegion(
+                projectState,
+                region.id
+            );
+            if(estratoRelacionado){
+                alert(
+                    `${region.id} no se puede eliminar porque define ` +
+                    `${estratoRelacionado.id} (${estratoRelacionado.nombre}). ` +
+                    "Elimina primero el estrato y luego, si corresponde, la región geométrica."
+                );
                 return;
             }
 
@@ -3913,6 +4200,197 @@
             );
         }
 
+function escaparHtmlTexto(valor){
+    return String(valor ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function htmlPanelEstratos(){
+
+    const items = GeoFEMStrata.estratos(projectState);
+    const seleccionado = GeoFEMStrata.estratoSeleccionado(projectState);
+    const region = GeoFEMRegions.regionSeleccionada(projectState);
+    const regionDisponible = region && !GeoFEMStrata.buscarPorRegion(projectState, region.id);
+
+    const lista = items.length
+        ? `<div class="strata-list">${items.map((estrato) => `
+            <button
+                class="tool-btn ${seleccionado?.id === estrato.id ? "active-tool" : ""}"
+                onclick="seleccionarEstratoCad('${estrato.id}')"
+            >
+                ▰ ${escaparHtmlTexto(estrato.id)} · ${escaparHtmlTexto(estrato.nombre)}
+                <span class="stratum-tool-meta">Región ${escaparHtmlTexto(estrato.regionId)}${estrato.materialId ? ` · ${escaparHtmlTexto(estrato.materialId)}` : " · sin material"}</span>
+            </button>
+        `).join("")}</div>`
+        : `<div class="strata-empty">Aún no hay estratos. Selecciona una región cerrada en Geometría y conviértela en una entidad geotécnica.</div>`;
+
+    return `
+        <button
+            class="tool-btn"
+            onclick="crearEstratoDesdeRegionSeleccionadaCad()"
+            ${regionDisponible ? "" : "disabled"}
+            title="${regionDisponible ? `Crear estrato a partir de ${region.id}` : "Selecciona una región geométrica que aún no tenga estrato"}"
+        >
+            ➕ Crear desde región seleccionada
+        </button>
+
+        ${region ? `<div class="strata-empty" style="margin-top:8px;">Región CAD seleccionada: <strong>${region.id}</strong>${regionDisponible ? " · disponible" : " · ya vinculada"}</div>` : ""}
+
+        ${lista}
+
+        <button
+            class="tool-btn danger-tool"
+            onclick="eliminarEstratoSeleccionadoCad()"
+            ${seleccionado ? "" : "disabled"}
+        >
+            🗑 Eliminar estrato seleccionado
+        </button>
+    `;
+}
+
+function renderizarPanelEstratos(){
+    document.getElementById("toolTitle").innerText = "Estratos";
+    document.getElementById("toolPanel").innerHTML = htmlPanelEstratos();
+}
+
+function crearEstratoDesdeRegionSeleccionadaCad(){
+    const region = GeoFEMRegions.regionSeleccionada(projectState);
+    if(!region){
+        alert("Selecciona primero una región cerrada en el módulo Geometría.");
+        return;
+    }
+
+    const resultado = GeoFEMStrata.crearEstratoDesdeRegion(projectState, region.id);
+    if(!resultado.ok){
+        if(resultado.reason === "region_already_assigned"){
+            alert(`${region.id} ya está vinculada a ${resultado.estrato.id} (${resultado.estrato.nombre}).`);
+            GeoFEMStrata.seleccionarEstrato(projectState, resultado.estrato.id);
+            renderizarProjectState();
+            renderizarPanelEstratos();
+            return;
+        }
+        alert("No fue posible crear el estrato.");
+        return;
+    }
+
+    renderizarProjectState();
+    renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${resultado.estrato.id} creado desde ${resultado.estrato.regionId}.`;
+}
+
+function seleccionarEstratoCad(id){
+    const estrato = GeoFEMStrata.seleccionarEstrato(projectState, id);
+    if(!estrato) return;
+    renderizarProjectState();
+    renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${estrato.id}: ${estrato.nombre} · región ${estrato.regionId}`;
+}
+
+function normalizarColorHexEstratoUi(valor){
+    let texto = String(valor || "").trim();
+    if(!texto) return null;
+    if(!texto.startsWith("#")) texto = `#${texto}`;
+    if(!/^#[0-9a-fA-F]{6}$/.test(texto)) return null;
+    return texto.toLowerCase();
+}
+
+function cargarColorEstratoEnEditor(color){
+    const normalizado = normalizarColorHexEstratoUi(color) || "#99d8c9";
+    const picker = document.getElementById("inputSelectedStratumColor");
+    const hex = document.getElementById("inputSelectedStratumColorHex");
+    const preview = document.getElementById("selectedStratumColorPreview");
+
+    if(picker) picker.value = normalizado;
+    if(hex) hex.value = normalizado.toUpperCase();
+    if(preview) preview.style.backgroundColor = normalizado;
+}
+
+function sincronizarColorEstratoDesdePicker(color){
+    const normalizado = normalizarColorHexEstratoUi(color);
+    if(!normalizado) return;
+    const hex = document.getElementById("inputSelectedStratumColorHex");
+    const preview = document.getElementById("selectedStratumColorPreview");
+    if(hex) hex.value = normalizado.toUpperCase();
+    if(preview) preview.style.backgroundColor = normalizado;
+}
+
+function sincronizarColorEstratoDesdeHex(color){
+    const normalizado = normalizarColorHexEstratoUi(color);
+    if(!normalizado) return;
+    const picker = document.getElementById("inputSelectedStratumColor");
+    const preview = document.getElementById("selectedStratumColorPreview");
+    if(picker) picker.value = normalizado;
+    if(preview) preview.style.backgroundColor = normalizado;
+}
+
+function seleccionarColorEstratoDesdePaleta(color){
+    cargarColorEstratoEnEditor(color);
+}
+
+function actualizarEstratoSeleccionadoDesdePanel(){
+    const estrato = GeoFEMStrata.estratoSeleccionado(projectState);
+    if(!estrato) return;
+
+    const nombre = document.getElementById("inputSelectedStratumName").value;
+    const valorHex = document.getElementById("inputSelectedStratumColorHex")?.value;
+    const valorPicker = document.getElementById("inputSelectedStratumColor")?.value;
+    const displayColor =
+        normalizarColorHexEstratoUi(valorHex) ||
+        normalizarColorHexEstratoUi(valorPicker);
+
+    if(!displayColor){
+        alert("El color debe escribirse en formato hexadecimal, por ejemplo #99D8C9.");
+        return;
+    }
+
+    const resultado = GeoFEMStrata.actualizarEstrato(projectState, estrato.id, {
+        nombre,
+        displayColor,
+    });
+
+    if(!resultado.ok){
+        alert("No fue posible actualizar el estrato.");
+        return;
+    }
+
+    renderizarProjectState();
+    if(projectState.ui.activeModule === "estratos"){
+        renderizarPanelEstratos();
+    }
+    document.getElementById("txt-status").textContent =
+        `${resultado.estrato.id}: color ${displayColor.toUpperCase()} guardado`;
+}
+
+function eliminarEstratoSeleccionadoCad(){
+    const estrato = GeoFEMStrata.estratoSeleccionado(projectState);
+    if(!estrato) return;
+
+    const confirmar = window.confirm(
+        `¿Eliminar ${estrato.id} (${estrato.nombre})? ` +
+        `La región ${estrato.regionId} se conservará como geometría CAD.`
+    );
+    if(!confirmar) return;
+
+    const resultado = GeoFEMStrata.eliminarEstratoSeleccionado(projectState);
+    if(!resultado.ok){
+        alert("No fue posible eliminar el estrato.");
+        return;
+    }
+
+    renderizarProjectState();
+    if(projectState.ui.activeModule === "estratos"){
+        renderizarPanelEstratos();
+    }
+    document.getElementById("txt-status").textContent =
+        `${resultado.estrato.id} eliminado; ${resultado.estrato.regionId} se conserva.`;
+}
+
 function cambiarModulo(modulo, boton){
 
     if(projectState && projectState.ui){
@@ -3922,6 +4400,9 @@ function cambiarModulo(modulo, boton){
             projectState.ui.activeTool = "select";
             projectState.ui.lineDraftStartPointId = null;
             GeoFEMGeometry.cancelarBorradorPolilinea(projectState);
+            GeoFEMRegions.cancelarBorradorRegion(projectState);
+            GeoFEMRegions.cancelarEdicionRegion(projectState);
+            GeoFEMSnap.limpiarCandidato(projectState);
         }
     }
 
@@ -3958,6 +4439,11 @@ function cambiarModulo(modulo, boton){
 
         panel.innerHTML = htmlPanelGeometria();
         actualizarHerramientasCadUi();
+    }
+
+    if(modulo==="estratos"){
+
+        renderizarPanelEstratos();
     }
 
     if(modulo==="malla"){

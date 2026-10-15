@@ -426,6 +426,23 @@
         if (indice < 0) {
             return {ok: false, reason: "not_found", region: null};
         }
+
+        // Una región con significado geotécnico no puede desaparecer dejando
+        // un estrato apuntando a un contorno inexistente. La capa de Estratos
+        // se carga después de este archivo, pero en tiempo de ejecución ya está
+        // disponible cuando el usuario intenta eliminar la región.
+        const estrato = global.GeoFEMStrata?.buscarPorRegion
+            ? global.GeoFEMStrata.buscarPorRegion(state, id)
+            : null;
+        if (estrato) {
+            return {
+                ok: false,
+                reason: "region_in_use_by_stratum",
+                region: lista[indice],
+                stratum: estrato,
+            };
+        }
+
         const [eliminada] = lista.splice(indice, 1);
         const seleccion = seleccionActual(state);
         if (seleccion?.type === "region" && String(seleccion.id) === String(id)) {

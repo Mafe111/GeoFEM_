@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "1.6.0";
+    const STATE_SCHEMA_VERSION = "2.0.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -55,6 +55,13 @@
                     polyline: 1,
                     region: 1,
                 },
+            },
+
+            // Capa semántica geotécnica. Cada estrato referencia una región
+            // geométrica existente; nunca duplica sus coordenadas.
+            strata: {
+                items: [],
+                nextId: 1,
             },
 
             materials: [],
@@ -151,6 +158,9 @@
                 // región objetivo para no depender de la selección visual.
                 regionEditTargetId: null,
 
+                // Selección semántica independiente de la selección CAD.
+                selectedStratumId: null,
+
                 // Candidato temporal de snap bajo el cursor. Es estado de UI,
                 // no geometría persistente y nunca debe marcar dirty.
                 snapCandidate: null,
@@ -181,6 +191,7 @@
             projectId: state?.project?.id ?? null,
             projectName: state?.project?.nombre ?? "",
             geometry,
+            strata: Array.isArray(state?.strata?.items) ? state.strata.items.length : 0,
             materials: Array.isArray(state?.materials) ? state.materials.length : 0,
             nodes: Array.isArray(mesh.nodes) ? mesh.nodes.length : 0,
             elements: Array.isArray(mesh.elements) ? mesh.elements.length : 0,
