@@ -427,6 +427,20 @@
             return {ok: false, reason: "not_found", region: null};
         }
 
+        // El dominio geológico D1 referencia una región CAD. No puede
+        // eliminarse su contorno sin retirar primero ese rol semántico.
+        const domain = global.GeoFEMGeology?.dominio
+            ? global.GeoFEMGeology.dominio(state)
+            : null;
+        if (domain && String(domain.regionId) === String(id)) {
+            return {
+                ok: false,
+                reason: "region_in_use_by_domain",
+                region: lista[indice],
+                domain,
+            };
+        }
+
         // Una región con significado geotécnico no puede desaparecer dejando
         // un estrato apuntando a un contorno inexistente. La capa de Estratos
         // se carga después de este archivo, pero en tiempo de ejecución ya está
@@ -485,6 +499,16 @@
         }
         if (region.pointIds.length <= 3) {
             return {ok: false, reason: "minimum_vertices", region};
+        }
+
+        // Si R# ya funciona como dominio y existen interfaces registradas,
+        // retirar un vértice puede cambiar el borde y romper la topología de
+        // las interfaces. En este paso exigimos retirar primero las interfaces.
+        if (
+            global.GeoFEMGeology?.dominioUsaRegion?.(state, region.id) &&
+            global.GeoFEMGeology?.interfaces?.(state)?.length > 0
+        ) {
+            return {ok: false, reason: "domain_topology_locked", region};
         }
 
         const nuevosIds = region.pointIds.filter(

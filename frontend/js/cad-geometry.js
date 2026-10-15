@@ -259,6 +259,25 @@
             }
         }
 
+        // Si el punto participa en D1 o en una interfaz I#, la edición debe
+        // conservar la validez del modelo geológico completo.
+        if (global.GeoFEMGeology?.validarEdicionPunto) {
+            const validacionGeologica = global.GeoFEMGeology.validarEdicionPunto(
+                state,
+                punto.id,
+                {x, y}
+            );
+            if (!validacionGeologica.ok) {
+                return {
+                    ok: false,
+                    reason: validacionGeologica.reason,
+                    detailReason: validacionGeologica.detailReason || null,
+                    interfaceId: validacionGeologica.interfaceId || null,
+                    punto,
+                };
+            }
+        }
+
         const cambio = punto.x !== x || punto.y !== y;
         punto.x = x;
         punto.y = y;
@@ -543,6 +562,18 @@
 
         if (indice < 0) {
             return {ok: false, reason: "not_found", polilinea: null};
+        }
+
+        const interfaz = global.GeoFEMGeology?.interfazUsaPolilinea
+            ? global.GeoFEMGeology.interfazUsaPolilinea(state, id)
+            : null;
+        if (interfaz) {
+            return {
+                ok: false,
+                reason: "polyline_in_use_by_interface",
+                polilinea: lista[indice],
+                interface: interfaz,
+            };
         }
 
         const [eliminada] = lista.splice(indice, 1);

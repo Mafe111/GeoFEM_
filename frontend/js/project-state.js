@@ -11,7 +11,7 @@
 (function (global) {
     "use strict";
 
-    const STATE_SCHEMA_VERSION = "2.0.0";
+    const STATE_SCHEMA_VERSION = "2.1.0";
 
     function normalizarProyecto(proyecto = {}) {
         return {
@@ -57,8 +57,20 @@
                 },
             },
 
-            // Capa semántica geotécnica. Cada estrato referencia una región
-            // geométrica existente; nunca duplica sus coordenadas.
+            // Modelo geológico previo a la partición estratigráfica.
+            // D1 referencia una región cerrada y cada interfaz I# referencia
+            // una polilínea existente. Ninguna de estas entidades duplica
+            // coordenadas geométricas.
+            geology: {
+                domain: null,
+                interfaces: {
+                    items: [],
+                    nextId: 1,
+                },
+            },
+
+            // Capa semántica geotécnica. En el flujo nuevo los estratos se
+            // generarán a partir de la partición D1 + interfaces (Paso 3).
             strata: {
                 items: [],
                 nextId: 1,
@@ -158,8 +170,9 @@
                 // región objetivo para no depender de la selección visual.
                 regionEditTargetId: null,
 
-                // Selección semántica independiente de la selección CAD.
+                // Selecciones semánticas independientes de la selección CAD.
                 selectedStratumId: null,
+                selectedGeologyInterfaceId: null,
 
                 // Candidato temporal de snap bajo el cursor. Es estado de UI,
                 // no geometría persistente y nunca debe marcar dirty.
@@ -191,6 +204,12 @@
             projectId: state?.project?.id ?? null,
             projectName: state?.project?.nombre ?? "",
             geometry,
+            geology: {
+                domainDefined: Boolean(state?.geology?.domain),
+                interfaces: Array.isArray(state?.geology?.interfaces?.items)
+                    ? state.geology.interfaces.items.length
+                    : 0,
+            },
             strata: Array.isArray(state?.strata?.items) ? state.strata.items.length : 0,
             materials: Array.isArray(state?.materials) ? state.materials.length : 0,
             nodes: Array.isArray(mesh.nodes) ? mesh.nodes.length : 0,

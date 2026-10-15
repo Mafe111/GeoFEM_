@@ -729,6 +729,16 @@
                 1px solid #dbe4ee;
 
             padding:18px;
+            padding-bottom:28px;
+
+            /*
+             * El panel de herramientas puede crecer (por ejemplo, Dominio +
+             * Interfaces + Estratos derivados). Debe desplazarse de forma
+             * independiente sin empujar la barra de estado fuera de pantalla.
+             */
+            overflow-y:auto;
+            min-height:0;
+            scrollbar-gutter:stable;
         }
 
         .sidebar-title{
@@ -896,6 +906,48 @@
     font-size:12px;
     line-height:1.45;
     background:#f8fafc;
+}
+
+.geology-section{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px solid #e2e8f0;
+}
+
+.geology-section:first-child{
+    margin-top:0;
+    padding-top:0;
+    border-top:none;
+}
+
+.geology-section-title{
+    margin:0 0 8px;
+    color:#0f172a;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.01em;
+}
+
+.geology-semantic-card{
+    margin-top:8px;
+    padding:9px 10px;
+    border:1px solid #cbd5e1;
+    border-radius:10px;
+    background:#f8fafc;
+    color:#475569;
+    font-size:11px;
+    line-height:1.45;
+}
+
+.geology-semantic-card strong{
+    color:#0f172a;
+}
+
+.geology-interface-list{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    margin-top:8px;
 }
 
 .stratum-tool-meta{
@@ -1777,6 +1829,7 @@
                     <g id="regionLayer"></g>
                     <g id="strataLayer"></g>
                     <g id="geometryLayer"></g>
+                    <g id="geologyLayer"></g>
                     <g id="meshLayer"></g>
                     <g id="boundaryLayer"></g>
                     <g id="resultLayer"></g>
@@ -1882,6 +1935,16 @@
             <p>
                 Regiones:
                 <span id="propRegiones">0</span>
+            </p>
+
+            <p>
+                Dominio:
+                <span id="propDominio">Sin definir</span>
+            </p>
+
+            <p>
+                Interfaces:
+                <span id="propInterfaces">0</span>
             </p>
 
             <p>
@@ -2089,7 +2152,7 @@
             <div id="propStratumEmpty">
                 <p>Sin estrato seleccionado.</p>
                 <p style="font-size:12px; color:#64748b; line-height:1.45;">
-                    Selecciona una región en Geometría, abre Estratos y crea su entidad geotécnica.
+                    Los estratos se generarán a partir del dominio D1 y sus interfaces estratigráficas.
                 </p>
             </div>
 
@@ -2383,6 +2446,7 @@
     <script src="js/cad-geometry.js"></script>
     <script src="js/cad-regions.js"></script>
     <script src="js/cad-strata.js"></script>
+    <script src="js/cad-geology.js"></script>
     <script src="js/cad-snap.js"></script>
 
     <script>
@@ -2696,6 +2760,11 @@
                 resumen.geometry.polylines;
             document.getElementById("propRegiones").textContent =
                 resumen.geometry.regions;
+            const domain = GeoFEMGeology.dominio(projectState);
+            document.getElementById("propDominio").textContent =
+                domain ? `${domain.id} → ${domain.regionId}` : "Sin definir";
+            document.getElementById("propInterfaces").textContent =
+                resumen.geology?.interfaces ?? 0;
             document.getElementById("propEstratos").textContent =
                 resumen.strata;
             document.getElementById("propMateriales").textContent =
@@ -2910,6 +2979,14 @@
             // y solo cambia su representación en pantalla.
             GeoFEMGeometry.renderGeometry(
                 document.getElementById("geometryLayer"),
+                projectState,
+                projectState.viewport
+            );
+
+            // D1 e I# son roles semánticos que referencian región/polilíneas
+            // existentes; se dibujan como overlay sin duplicar geometría.
+            GeoFEMGeology.renderGeology(
+                document.getElementById("geologyLayer"),
                 projectState,
                 projectState.viewport
             );
@@ -3214,6 +3291,12 @@
                         `No se puede mover ${punto.id}: coincidiría exactamente con ` +
                         `otro vértice de ${resultado.regionId || "una región"}.`
                     );
+                } else if(resultado.reason === "geology_interface_invalid"){
+                    alert(
+                        `No se puede mover ${punto.id}: la edición invalidaría ` +
+                        `${resultado.interfaceId || "una interfaz estratigráfica"} ` +
+                        `(detalle: ${resultado.detailReason || "topología inválida"}).`
+                    );
                 } else {
                     alert("No fue posible actualizar el punto seleccionado.");
                 }
@@ -3298,6 +3381,15 @@
                 return;
             }
 
+            const interfaz = GeoFEMGeology.buscarPorPolilinea(projectState, polilinea.id);
+            if(interfaz){
+                alert(
+                    `${polilinea.id} no se puede eliminar porque define ${interfaz.id}. ` +
+                    "Retira primero el rol de interfaz estratigráfica en el módulo Estratos."
+                );
+                return;
+            }
+
             const longitud = GeoFEMGeometry.longitudPolilinea(projectState, polilinea);
             const confirmar = window.confirm(
                 `¿Eliminar ${polilinea.id} (${polilinea.pointIds.join(" → ")})` +
@@ -3324,6 +3416,15 @@
         function eliminarRegionSeleccionadaCad(){
             const region = GeoFEMRegions.regionSeleccionada(projectState);
             if(!region){
+                return;
+            }
+
+            const domain = GeoFEMGeology.dominio(projectState);
+            if(domain && String(domain.regionId) === String(region.id)){
+                alert(
+                    `${region.id} no se puede eliminar porque define ${domain.id} (Dominio del talud). ` +
+                    "Quita primero el dominio desde el módulo Estratos."
+                );
                 return;
             }
 
@@ -3590,8 +3691,19 @@
                     return;
                 }
 
-                // Fuera del módulo Geometría no permitimos crear/seleccionar
-                // entidades CAD en este paso.
+                /*
+                 * En Estratos permitimos seleccionar directamente sobre el
+                 * lienzo las entidades CAD que alimentan el modelo geológico.
+                 * No es necesario volver a Geometría solo para seleccionar R#
+                 * o PL#. Las herramientas de creación siguen siendo exclusivas
+                 * del módulo Geometría.
+                 */
+                if(projectState?.ui?.activeModule === "estratos"){
+                    evento.preventDefault();
+                    seleccionarEntidadCadDesdeEstratos(evento);
+                    return;
+                }
+
                 if(projectState?.ui?.activeModule !== "geometria"){
                     return;
                 }
@@ -3828,6 +3940,11 @@
                             alert("Quitar ese vértice produciría una autointersección.");
                         } else if(resultado.reason === "zero_area"){
                             alert("Quitar ese vértice dejaría la región con área cero.");
+                        } else if(resultado.reason === "domain_topology_locked"){
+                            alert(
+                                `${region.id} es el dominio D1 y ya tiene interfaces registradas. ` +
+                                "Retira primero las interfaces antes de quitar vértices del dominio."
+                            );
                         } else {
                             alert("No fue posible quitar el vértice del contorno.");
                         }
@@ -4209,52 +4326,303 @@ function escaparHtmlTexto(valor){
         .replaceAll("'", "&#039;");
 }
 
+function seleccionarEntidadCadDesdeEstratos(evento){
+    const entidad = GeoFEMGeometry.entidadDesdeTarget(evento.target);
+
+    GeoFEMSnap.limpiarCandidato(projectState);
+
+    if(entidad?.type === "region"){
+        GeoFEMGeology.limpiarSeleccionInterfaz(projectState);
+        GeoFEMRegions.seleccionarRegion(projectState, entidad.id);
+
+        const domain = GeoFEMGeology.dominio(projectState);
+        document.getElementById("txt-status").textContent =
+            domain?.regionId === entidad.id
+                ? `${entidad.id} seleccionada · define ${domain.id}.`
+                : `${entidad.id} seleccionada para el modelo geológico.`;
+
+    } else if(entidad?.type === "polyline"){
+        const interfaz = GeoFEMGeology.buscarPorPolilinea(projectState, entidad.id);
+
+        if(interfaz){
+            GeoFEMGeology.seleccionarInterfaz(projectState, interfaz.id);
+            document.getElementById("txt-status").textContent =
+                `${entidad.id} seleccionada · define ${interfaz.id}.`;
+        } else {
+            GeoFEMGeology.limpiarSeleccionInterfaz(projectState);
+            GeoFEMGeometry.seleccionarPolilinea(projectState, entidad.id);
+            document.getElementById("txt-status").textContent =
+                `${entidad.id} seleccionada · disponible para registrar como interfaz.`;
+        }
+
+    } else {
+        GeoFEMGeology.limpiarSeleccionInterfaz(projectState);
+        GeoFEMGeometry.limpiarSeleccion(projectState);
+        document.getElementById("txt-status").textContent =
+            "Estratos: haz clic sobre una región R# o una polilínea PL# para seleccionarla.";
+    }
+
+    renderizarProjectState();
+    renderizarPanelEstratos();
+}
+
 function htmlPanelEstratos(){
 
-    const items = GeoFEMStrata.estratos(projectState);
-    const seleccionado = GeoFEMStrata.estratoSeleccionado(projectState);
+    const domain = GeoFEMGeology.dominio(projectState);
+    const interfaces = GeoFEMGeology.interfaces(projectState);
+    const selectedInterface = GeoFEMGeology.interfazSeleccionada(projectState);
     const region = GeoFEMRegions.regionSeleccionada(projectState);
-    const regionDisponible = region && !GeoFEMStrata.buscarPorRegion(projectState, region.id);
+    const polilinea = GeoFEMGeometry.polilineaSeleccionada(projectState);
+    const interfazDePolilinea = polilinea
+        ? GeoFEMGeology.buscarPorPolilinea(projectState, polilinea.id)
+        : null;
+    const estratos = GeoFEMStrata.estratos(projectState);
+    const estratoSeleccionado = GeoFEMStrata.estratoSeleccionado(projectState);
 
-    const lista = items.length
-        ? `<div class="strata-list">${items.map((estrato) => `
+    const puedeDefinirDominio = Boolean(region && !domain && estratos.length === 0);
+    const puedeRegistrarInterfaz = Boolean(domain && polilinea && !interfazDePolilinea);
+
+    const domainHtml = domain
+        ? `<div class="geology-semantic-card">
+            <strong>${escaparHtmlTexto(domain.id)} · Dominio del talud</strong><br>
+            Región fuente: ${escaparHtmlTexto(domain.regionId)}<br>
+            <button class="tool-btn" style="margin-top:8px;" onclick="seleccionarDominioGeologicoCad()">
+                ↖ Seleccionar ${escaparHtmlTexto(domain.regionId)}
+            </button>
+            <button class="tool-btn danger-tool" style="margin-top:6px;" onclick="quitarDominioGeologicoCad()">
+                Quitar rol de dominio
+            </button>
+        </div>`
+        : `<div class="strata-empty">
+            Haz clic directamente sobre una región cerrada del lienzo para seleccionarla y definirla como D1.
+        </div>`;
+
+    const interfaceList = interfaces.length
+        ? `<div class="geology-interface-list">${interfaces.map((interfaz) => {
+            const source = GeoFEMGeometry.obtenerPolilinea(projectState, interfaz.polylineId);
+            const extremos = source?.pointIds?.length
+                ? `${source.pointIds[0]} → ${source.pointIds[source.pointIds.length - 1]}`
+                : "--";
+            return `<button
+                class="tool-btn ${selectedInterface?.id === interfaz.id ? "active-tool" : ""}"
+                onclick="seleccionarInterfazGeologicaCad('${interfaz.id}')"
+            >
+                ≋ ${escaparHtmlTexto(interfaz.id)} · ${escaparHtmlTexto(interfaz.polylineId)}
+                <span class="stratum-tool-meta">Extremos ${escaparHtmlTexto(extremos)}</span>
+            </button>`;
+        }).join("")}</div>`
+        : `<div class="strata-empty">Aún no hay interfaces. Dibuja una polilínea entre dos vértices del borde de D1 y regístrala como I1.</div>`;
+
+    const legacyStrata = estratos.length
+        ? `<div class="geology-semantic-card" style="border-color:#fdba74;background:#fff7ed;">
+            <strong>Estratos directos del Paso 1</strong><br>
+            El nuevo flujo D1 + interfaces reemplaza la creación directa desde regiones. Elimina estos estratos antes de definir D1.
+          </div>
+          <div class="strata-list">${estratos.map((estrato) => `
             <button
-                class="tool-btn ${seleccionado?.id === estrato.id ? "active-tool" : ""}"
+                class="tool-btn ${estratoSeleccionado?.id === estrato.id ? "active-tool" : ""}"
                 onclick="seleccionarEstratoCad('${estrato.id}')"
             >
                 ▰ ${escaparHtmlTexto(estrato.id)} · ${escaparHtmlTexto(estrato.nombre)}
-                <span class="stratum-tool-meta">Región ${escaparHtmlTexto(estrato.regionId)}${estrato.materialId ? ` · ${escaparHtmlTexto(estrato.materialId)}` : " · sin material"}</span>
+                <span class="stratum-tool-meta">Región ${escaparHtmlTexto(estrato.regionId)} · prototipo previo</span>
             </button>
-        `).join("")}</div>`
-        : `<div class="strata-empty">Aún no hay estratos. Selecciona una región cerrada en Geometría y conviértela en una entidad geotécnica.</div>`;
-
-    return `
-        <button
-            class="tool-btn"
-            onclick="crearEstratoDesdeRegionSeleccionadaCad()"
-            ${regionDisponible ? "" : "disabled"}
-            title="${regionDisponible ? `Crear estrato a partir de ${region.id}` : "Selecciona una región geométrica que aún no tenga estrato"}"
-        >
-            ➕ Crear desde región seleccionada
-        </button>
-
-        ${region ? `<div class="strata-empty" style="margin-top:8px;">Región CAD seleccionada: <strong>${region.id}</strong>${regionDisponible ? " · disponible" : " · ya vinculada"}</div>` : ""}
-
-        ${lista}
-
-        <button
+          `).join("")}</div>
+          <button
             class="tool-btn danger-tool"
             onclick="eliminarEstratoSeleccionadoCad()"
-            ${seleccionado ? "" : "disabled"}
-        >
-            🗑 Eliminar estrato seleccionado
-        </button>
+            ${estratoSeleccionado ? "" : "disabled"}
+          >
+            🗑 Eliminar estrato directo seleccionado
+          </button>`
+        : `<div class="strata-empty">
+            En el Paso 3 GeoFEM partirá D1 usando I1, I2, ... y generará automáticamente las regiones/estratos E1, E2, E3. Aquí todavía no se asignan materiales.
+          </div>`;
+
+    return `
+        <div class="strata-empty" style="margin-bottom:10px;">
+            <strong>Selección directa:</strong> en este módulo puedes hacer clic sobre una región R# o una polilínea PL# directamente en el lienzo. No necesitas volver a Geometría solo para seleccionarla.
+        </div>
+
+        <div class="geology-section">
+            <div class="geology-section-title">1 · Dominio del talud</div>
+            <button
+                class="tool-btn"
+                onclick="definirDominioDesdeRegionSeleccionadaCad()"
+                ${puedeDefinirDominio ? "" : "disabled"}
+                title="${estratos.length ? "Elimina primero los estratos directos creados en el Paso 1" : (region ? "Definir la región seleccionada como D1" : "Haz clic sobre una región cerrada en el lienzo") }"
+            >
+                ▰ Definir región seleccionada como D1
+            </button>
+            ${region ? `<div class="strata-empty" style="margin-top:8px;">Región CAD seleccionada: <strong>${escaparHtmlTexto(region.id)}</strong>${domain?.regionId === region.id ? " · es D1" : ""}</div>` : ""}
+            ${domainHtml}
+        </div>
+
+        <div class="geology-section">
+            <div class="geology-section-title">2 · Interfaces estratigráficas</div>
+            <button
+                class="tool-btn"
+                onclick="registrarInterfazDesdePolilineaSeleccionadaCad()"
+                ${puedeRegistrarInterfaz ? "" : "disabled"}
+                title="${!domain ? "Define primero D1" : (!polilinea ? "Haz clic sobre una polilínea en el lienzo" : (interfazDePolilinea ? `${polilinea.id} ya define ${interfazDePolilinea.id}` : "Registrar polilínea como interfaz"))}"
+            >
+                ≋ Registrar polilínea seleccionada como interfaz
+            </button>
+            ${polilinea ? `<div class="strata-empty" style="margin-top:8px;">Polilínea CAD seleccionada: <strong>${escaparHtmlTexto(polilinea.id)}</strong>${interfazDePolilinea ? ` · ${escaparHtmlTexto(interfazDePolilinea.id)}` : " · disponible para validar"}</div>` : ""}
+            ${interfaceList}
+            <button
+                class="tool-btn danger-tool"
+                onclick="eliminarInterfazGeologicaSeleccionadaCad()"
+                ${selectedInterface ? "" : "disabled"}
+            >
+                Quitar interfaz seleccionada
+            </button>
+        </div>
+
+        <div class="geology-section">
+            <div class="geology-section-title">3 · Estratos derivados</div>
+            ${legacyStrata}
+        </div>
     `;
 }
 
 function renderizarPanelEstratos(){
-    document.getElementById("toolTitle").innerText = "Estratos";
+    document.getElementById("toolTitle").innerText = "Estratos · Modelo geológico";
     document.getElementById("toolPanel").innerHTML = htmlPanelEstratos();
+}
+
+function definirDominioDesdeRegionSeleccionadaCad(){
+    const region = GeoFEMRegions.regionSeleccionada(projectState);
+    if(!region){
+        alert("Selecciona primero una región cerrada en el módulo Geometría.");
+        return;
+    }
+
+    const resultado = GeoFEMGeology.definirDominio(projectState, region.id);
+    if(!resultado.ok){
+        if(resultado.reason === "legacy_strata_present"){
+            alert(
+                "Este proyecto contiene estratos creados con el flujo directo del Paso 1. " +
+                "Elimínalos primero para utilizar el nuevo flujo Dominio + Interfaces."
+            );
+        } else if(resultado.reason === "already_domain"){
+            alert(`${region.id} ya es el dominio ${resultado.domain.id}.`);
+        } else if(resultado.reason === "domain_already_defined"){
+            alert(
+                `Ya existe ${resultado.domain.id} → ${resultado.domain.regionId}. ` +
+                "Quita primero el dominio actual si necesitas cambiarlo."
+            );
+        } else {
+            alert("No fue posible definir el dominio del talud.");
+        }
+        return;
+    }
+
+    renderizarProjectState();
+    renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${resultado.domain.id} definido desde ${resultado.domain.regionId}.`;
+}
+
+function seleccionarDominioGeologicoCad(){
+    const domain = GeoFEMGeology.dominio(projectState);
+    if(!domain) return;
+    GeoFEMRegions.seleccionarRegion(projectState, domain.regionId);
+    renderizarProjectState();
+    if(projectState.ui.activeModule === "estratos") renderizarPanelEstratos();
+}
+
+function quitarDominioGeologicoCad(){
+    const domain = GeoFEMGeology.dominio(projectState);
+    if(!domain) return;
+    const confirmar = window.confirm(
+        `¿Quitar ${domain.id} como dominio del talud? La región ${domain.regionId} se conservará.`
+    );
+    if(!confirmar) return;
+
+    const resultado = GeoFEMGeology.eliminarDominio(projectState);
+    if(!resultado.ok){
+        if(resultado.reason === "interfaces_present"){
+            alert("Quita primero todas las interfaces estratigráficas antes de retirar D1.");
+        } else {
+            alert("No fue posible quitar el dominio.");
+        }
+        return;
+    }
+    renderizarProjectState();
+    renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${resultado.domain.id} retirado; ${resultado.domain.regionId} se conserva como región CAD.`;
+}
+
+function mensajeErrorInterfaz(resultado){
+    const mensajes = {
+        no_domain: "Define primero el dominio D1.",
+        polyline_not_found: "La polilínea seleccionada ya no existe.",
+        already_registered: "Esa polilínea ya está registrada como interfaz.",
+        insufficient_vertices: "Una interfaz necesita al menos dos vértices.",
+        endpoints_must_be_domain_vertices:
+            "Los dos extremos de la interfaz deben ser vértices reales del contorno de D1. Usa + Vértice en borde si necesitas crear un punto exacto sobre el límite.",
+        same_endpoint: "Los extremos de la interfaz deben ser distintos.",
+        point_outside_domain: "La interfaz contiene un vértice fuera de D1.",
+        internal_vertex_on_boundary: "Solo los dos extremos de una interfaz pueden tocar el borde de D1.",
+        self_intersection: "La polilínea se cruza consigo misma y no puede ser una interfaz estratigráfica.",
+        segment_outside_domain: "Un tramo de la interfaz sale fuera del dominio D1.",
+        segment_crosses_domain_boundary: "La interfaz cruza el borde de D1 en una posición no permitida.",
+        touches_domain_boundary_interior: "La interfaz toca el borde de D1 en un punto interior. Solo se permiten los dos extremos.",
+        intersects_existing_interface: `La nueva interfaz se cruza o toca con ${resultado.interfaceId || "otra interfaz"}.`,
+        missing_point: "La interfaz o el dominio contienen referencias a puntos inexistentes.",
+    };
+    return mensajes[resultado.reason] || `No fue posible registrar la interfaz (${resultado.reason || "error desconocido"}).`;
+}
+
+function registrarInterfazDesdePolilineaSeleccionadaCad(){
+    const polilinea = GeoFEMGeometry.polilineaSeleccionada(projectState);
+    if(!polilinea){
+        alert("Selecciona primero una polilínea en el módulo Geometría.");
+        return;
+    }
+
+    const resultado = GeoFEMGeology.crearInterfazDesdePolilinea(
+        projectState,
+        polilinea.id
+    );
+    if(!resultado.ok){
+        alert(mensajeErrorInterfaz(resultado));
+        return;
+    }
+
+    renderizarProjectState();
+    renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${resultado.interface.id} registrada desde ${resultado.interface.polylineId}.`;
+}
+
+function seleccionarInterfazGeologicaCad(id){
+    const interfaz = GeoFEMGeology.seleccionarInterfaz(projectState, id);
+    if(!interfaz) return;
+    renderizarProjectState();
+    if(projectState.ui.activeModule === "estratos") renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${interfaz.id} → ${interfaz.polylineId}`;
+}
+
+function eliminarInterfazGeologicaSeleccionadaCad(){
+    const interfaz = GeoFEMGeology.interfazSeleccionada(projectState);
+    if(!interfaz) return;
+    const confirmar = window.confirm(
+        `¿Quitar ${interfaz.id} como interfaz estratigráfica? ${interfaz.polylineId} se conservará como polilínea CAD.`
+    );
+    if(!confirmar) return;
+
+    const resultado = GeoFEMGeology.eliminarInterfaz(projectState, interfaz.id);
+    if(!resultado.ok){
+        alert("No fue posible quitar la interfaz.");
+        return;
+    }
+    renderizarProjectState();
+    renderizarPanelEstratos();
+    document.getElementById("txt-status").textContent =
+        `${resultado.interface.id} retirada; ${resultado.interface.polylineId} se conserva.`;
 }
 
 function crearEstratoDesdeRegionSeleccionadaCad(){
